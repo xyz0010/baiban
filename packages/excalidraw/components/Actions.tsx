@@ -29,7 +29,10 @@ import type {
   NonDeletedSceneElementsMap,
 } from "@excalidraw/element/types";
 
-import { actionToggleZenMode } from "../actions";
+import {
+  actionTogglePresentationMode,
+  actionToggleZenMode,
+} from "../actions";
 
 import { alignActionsPredicate } from "../actions/actionAlign";
 import { trackEvent } from "../analytics";
@@ -82,6 +85,7 @@ import {
   DotsHorizontalIcon,
   SelectionIcon,
   pencilIcon,
+  presentationIcon,
 } from "./icons";
 
 import { Island } from "./Island";
@@ -1043,11 +1047,13 @@ export const ShapesSwitcher = ({
   setAppState,
   app,
   UIOptions,
+  actionManager,
 }: {
   activeTool: UIAppState["activeTool"];
   setAppState: React.Component<any, AppState>["setState"];
   app: AppClassProperties;
   UIOptions: AppProps["UIOptions"];
+  actionManager: ActionManager;
 }) => {
   const [isExtraToolsMenuOpen, setIsExtraToolsMenuOpen] = useState(false);
   const stylesPanelMode = useStylesPanelMode();
@@ -1247,26 +1253,41 @@ export const ShapesSwitcher = ({
               {t("toolBar.lasso")}
             </DropdownMenu.Item>
           )}
-          <div style={{ margin: "6px 0", fontSize: 14, fontWeight: 600 }}>
-            Generate
-          </div>
-          {app.props.aiEnabled !== false && <TTDDialogTriggerTunnel.Out />}
           <DropdownMenu.Item
-            onSelect={() => app.setOpenDialog({ name: "ttd", tab: "mermaid" })}
-            icon={mermaidLogoIcon}
-            data-testid="toolbar-embeddable"
+            onSelect={() =>
+              actionManager.executeAction(actionTogglePresentationMode)
+            }
+            icon={presentationIcon}
+            data-testid="toolbar-presentation-mode"
           >
-            {t("toolBar.mermaidToExcalidraw")}
+            {t("labels.presentationMode")}
           </DropdownMenu.Item>
-          {app.props.aiEnabled !== false && app.plugins.diagramToCode && (
-            <DropdownMenu.Item
-              onSelect={() => app.onMagicframeToolSelect()}
-              icon={MagicIcon}
-              data-testid="toolbar-magicframe"
-            >
-              {t("toolBar.magicframe")}
-              <DropdownMenu.Item.Badge>AI</DropdownMenu.Item.Badge>
-            </DropdownMenu.Item>
+          {app.props.aiEnabled !== false && (
+            <>
+              <div style={{ margin: "6px 0", fontSize: 14, fontWeight: 600 }}>
+                Generate
+              </div>
+              <TTDDialogTriggerTunnel.Out />
+              <DropdownMenu.Item
+                onSelect={() =>
+                  app.setOpenDialog({ name: "ttd", tab: "mermaid" })
+                }
+                icon={mermaidLogoIcon}
+                data-testid="toolbar-embeddable"
+              >
+                {t("toolBar.mermaidToExcalidraw")}
+              </DropdownMenu.Item>
+              {app.plugins.diagramToCode && (
+                <DropdownMenu.Item
+                  onSelect={() => app.onMagicframeToolSelect()}
+                  icon={MagicIcon}
+                  data-testid="toolbar-magicframe"
+                >
+                  {t("toolBar.magicframe")}
+                  <DropdownMenu.Item.Badge>AI</DropdownMenu.Item.Badge>
+                </DropdownMenu.Item>
+              )}
+            </>
           )}
         </DropdownMenu.Content>
       </DropdownMenu>

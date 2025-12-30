@@ -278,6 +278,7 @@ import type {
   ExcalidrawElbowArrowElement,
   SceneElementsMap,
   ExcalidrawBindableElement,
+  ExcalidrawFrameElement,
 } from "@excalidraw/element/types";
 
 import type { Mutable, ValueOf } from "@excalidraw/common/utility-types";
@@ -2970,6 +2971,16 @@ class App extends React.Component<AppProps, AppState> {
 
   /** generally invoked only if fullscreen was invoked programmatically */
   private onFullscreenChange = () => {
+    if (!document.fullscreenElement) {
+      if (this.state.presentationModeEnabled) {
+        this.setState({
+          presentationModeEnabled: false,
+          viewModeEnabled: false,
+          activeTool: { ...this.state.activeTool, type: "selection", customType: null },
+        });
+      }
+    }
+
     if (
       // points to the iframe element we fullscreened
       !document.fullscreenElement &&
@@ -3045,6 +3056,12 @@ class App extends React.Component<AppProps, AppState> {
         document,
         EVENT.GESTURE_END,
         this.onGestureEnd as any,
+        false,
+      ),
+      addEventListener(
+        document,
+        EVENT.FULLSCREENCHANGE,
+        this.onFullscreenChange,
         false,
       ),
       addEventListener(
@@ -4442,9 +4459,110 @@ class App extends React.Component<AppProps, AppState> {
         };
   };
 
+  private navigatePresentation = (dir: 1 | -1) => {
+    const frames = this.scene
+      .getNonDeletedElements()
+      .filter((el) => el.type === "frame") as ExcalidrawFrameElement[];
+    if (frames.length === 0) {
+      return;
+    }
+
+    const sortedFrames = frames.sort((a, b) => {
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      if (nameA && nameB) {
+        return nameA.localeCompare(nameB, undefined, { numeric: true });
+      }
+      if (nameA) {
+        return -1;
+      }
+      if (nameB) {
+        return 1;
+      }
+      if (Math.abs(a.y - b.y) > 10) {
+        return a.y - b.y;
+      }
+      return a.x - b.x;
+    });
+
+    const viewportCenterX = this.state.width / 2;
+    const viewportCenterY = this.state.height / 2;
+    const sceneCenterX =
+      viewportCenterX / this.state.zoom.value - this.state.scrollX;
+    const sceneCenterY =
+      viewportCenterY / this.state.zoom.value - this.state.scrollY;
+
+    let currentFrameIndex = -1;
+    let minDistance = Infinity;
+
+    sortedFrames.forEach((frame, index) => {
+      const frameCenterX = frame.x + frame.width / 2;
+      const frameCenterY = frame.y + frame.height / 2;
+
+      const dist = Math.hypot(
+        frameCenterX - sceneCenterX,
+        frameCenterY - sceneCenterY,
+      );
+
+      const isInside =
+        sceneCenterX >= frame.x &&
+        sceneCenterX <= frame.x + frame.width &&
+        sceneCenterY >= frame.y &&
+        sceneCenterY <= frame.y + frame.height;
+
+      if (isInside) {
+        if (dist < minDistance) {
+          minDistance = dist;
+          currentFrameIndex = index;
+        }
+      } else if (currentFrameIndex === -1) {
+        if (dist < minDistance) {
+          minDistance = dist;
+          currentFrameIndex = index;
+        }
+      }
+    });
+
+    let nextIndex = currentFrameIndex + dir;
+
+    if (nextIndex < 0) {
+      nextIndex = 0;
+    }
+    if (nextIndex >= sortedFrames.length) {
+      nextIndex = sortedFrames.length - 1;
+    }
+
+    const nextFrame = sortedFrames[nextIndex];
+    const scaleX = this.state.width / nextFrame.width;
+    const scaleY = this.state.height / nextFrame.height;
+    const zoomValue = Math.min(scaleX, scaleY);
+
+    this.setState({
+      scrollX:
+        this.state.width / 2 / zoomValue - (nextFrame.x + nextFrame.width / 2),
+      scrollY:
+        this.state.height / 2 / zoomValue -
+        (nextFrame.y + nextFrame.height / 2),
+      zoom: { value: zoomValue as any },
+    });
+  };
+
   // Input handling
   private onKeyDown = withBatchedUpdates(
     (event: React.KeyboardEvent | KeyboardEvent) => {
+      if (this.state.presentationModeEnabled) {
+        if (event.key === KEYS.ARROW_RIGHT || event.key === KEYS.SPACE) {
+          event.preventDefault();
+          this.navigatePresentation(1);
+          return;
+        }
+        if (event.key === KEYS.ARROW_LEFT) {
+          event.preventDefault();
+          this.navigatePresentation(-1);
+          return;
+        }
+      }
+
       // normalize `event.key` when CapsLock is pressed #2372
 
       if (
@@ -7124,6 +7242,12 @@ class App extends React.Component<AppProps, AppState> {
       event.button !== POINTER_BUTTON.TOUCH &&
       event.button !== POINTER_BUTTON.ERASER
     ) {
+      if (
+        event.button === POINTER_BUTTON.SECONDARY &&
+        this.state.presentationModeEnabled
+      ) {
+        this.navigatePresentation(1);
+      }
       return;
     }
 
@@ -7346,7 +7470,7 @@ class App extends React.Component<AppProps, AppState> {
       onPointerUp(_event || event.nativeEvent),
     );
 
-    if (!this.state.viewModeEnabled || this.state.activeTool.type === "laser") {
+    if (!this.state.viewModeEnabled || this.state.presentationModeEnabled || this.state.activeTool.type === "laser") {
       window.addEventListener(EVENT.POINTER_MOVE, onPointerMove);
       window.addEventListener(EVENT.POINTER_UP, onPointerUp);
       window.addEventListener(EVENT.KEYDOWN, onKeyDown);
@@ -7490,7 +7614,7 @@ class App extends React.Component<AppProps, AppState> {
         (event.button === POINTER_BUTTON.WHEEL ||
           (event.button === POINTER_BUTTON.MAIN && isHoldingSpace) ||
           isHandToolActive(this.state) ||
-          this.state.viewModeEnabled)
+          (this.state.viewModeEnabled && !this.state.presentationModeEnabled))
       )
     ) {
       return false;
@@ -8777,10 +8901,22 @@ class App extends React.Component<AppProps, AppState> {
       ...FRAME_STYLE,
     } as const;
 
+    let name: string | undefined = undefined;
+    if (type === "frame") {
+      const frames = this.scene
+        .getNonDeletedElements()
+        .filter((el) => el.type === "frame" && el.name) as ExcalidrawFrameElement[];
+      const maxNumber = frames.reduce((max, frame) => {
+        const num = parseInt(frame.name!, 10);
+        return !isNaN(num) && num > max ? num : max;
+      }, 0);
+      name = (maxNumber + 1).toString();
+    }
+
     const frame =
       type === TOOL_TYPE.magicframe
         ? newMagicFrameElement(constructorOpts)
-        : newFrameElement(constructorOpts);
+        : newFrameElement({ ...constructorOpts, name });
 
     this.scene.insertElement(frame);
 
