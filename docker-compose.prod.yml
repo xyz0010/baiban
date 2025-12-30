@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  excalidraw:
+    container_name: excalidraw
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    restart: always
+    environment:
+      - NODE_ENV=production
