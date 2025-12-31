@@ -750,7 +750,11 @@ export const renderElement = (
   switch (element.type) {
     case "magicframe":
     case "frame": {
-      if (appState.frameRendering.enabled && appState.frameRendering.outline) {
+      if (
+        appState.frameRendering.enabled &&
+        appState.frameRendering.outline &&
+        !appState.viewModeEnabled
+      ) {
         context.save();
         context.translate(
           element.x + appState.scrollX,

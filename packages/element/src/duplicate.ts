@@ -45,6 +45,19 @@ import type {
   NonDeletedSceneElementsMap,
 } from "./types";
 
+const getIncrementedName = (name: string | null): string => {
+  if (!name) {
+    return "Frame 1";
+  }
+  const match = name.match(/^(.*?)(\d+)$/);
+  if (match) {
+    const prefix = match[1];
+    const number = parseInt(match[2], 10);
+    return `${prefix}${number + 1}`;
+  }
+  return `${name} 1`;
+};
+
 /**
  * Duplicate an element, often used in the alt-drag operation.
  * Note that this method has gotten a bit complicated since the
@@ -75,6 +88,10 @@ export const duplicateElement = <TElement extends ExcalidrawElement>(
   if (randomizeSeed) {
     copy.seed = randomInteger();
     bumpVersion(copy);
+  }
+
+  if (isFrameLikeElement(copy as any)) {
+    (copy as any).name = getIncrementedName((copy as any).name);
   }
 
   copy.groupIds = getNewGroupIdsForDuplication(
