@@ -486,7 +486,7 @@ const LayerUI = ({
             );
           }
         }}
-        tab={DEFAULT_SIDEBAR.defaultTab}
+        tab="file-list"
       />
       <DefaultOverwriteConfirmDialog />
       {appState.openDialog?.name === "ttd" && <TTDDialog __fallback />}

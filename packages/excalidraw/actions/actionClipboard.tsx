@@ -212,11 +212,20 @@ export const actionCopyAsPng = register({
       true,
     );
     try {
-      await exportCanvas("clipboard", exportedElements, appState, app.files, {
-        ...appState,
-        exportingFrame,
-        name: app.getName(),
-      });
+      await exportCanvas(
+        "clipboard",
+        exportedElements,
+        {
+          ...appState,
+          exportScale: Math.max(window.devicePixelRatio, 3),
+        },
+        app.files,
+        {
+          ...appState,
+          exportingFrame,
+          name: app.getName(),
+        },
+      );
       return {
         appState: {
           ...appState,

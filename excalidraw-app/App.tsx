@@ -6,6 +6,8 @@ import {
   reconcileElements,
   useEditorInterface,
 } from "@excalidraw/excalidraw";
+import { DefaultSidebar } from "@excalidraw/excalidraw/components/DefaultSidebar";
+import { Sidebar } from "@excalidraw/excalidraw/components/Sidebar/Sidebar";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 import {
@@ -124,6 +126,7 @@ import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 import "./index.scss";
 
 import { AppSidebar } from "./components/AppSidebar";
+import { saveFile, loadFile, getFilesMetadata, createNewFile } from "./data/LocalFileStorage";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -332,6 +335,43 @@ const ExcalidrawWrapper = () => {
 
   const editorInterface = useEditorInterface();
 
+  const [currentFileId, setCurrentFileId] = useState<string | null>(null);
+
+  const [excalidrawAPI, excalidrawRefCallback] =
+    useCallbackRefState<ExcalidrawImperativeAPI>();
+
+  const handleLoadFile = async (id: string) => {
+    const fileData = await loadFile(id);
+    if (fileData && excalidrawAPI) {
+      setCurrentFileId(id);
+      excalidrawAPI.updateScene({
+        elements: fileData.elements,
+        appState: fileData.appState as any,
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+    }
+  };
+
+  useEffect(() => {
+    const initFile = async () => {
+      // Only init if we have the API and not collaborating
+      if (!excalidrawAPI) return;
+      
+      try {
+        const files = await getFilesMetadata();
+        if (files.length > 0) {
+            // files exist
+        } else {
+            // Create a default file if none exists
+            await createNewFile();
+        }
+      } catch (e) {
+        console.error("Error initializing files", e);
+      }
+    };
+    initFile();
+  }, [excalidrawAPI]);
+
   // initial state
   // ---------------------------------------------------------------------------
 
@@ -353,15 +393,14 @@ const ExcalidrawWrapper = () => {
     }, VERSION_TIMEOUT);
   }, []);
 
-  const [excalidrawAPI, excalidrawRefCallback] =
-    useCallbackRefState<ExcalidrawImperativeAPI>();
-
   const [, setShareDialogState] = useAtom(shareDialogStateAtom);
   const [collabAPI] = useAtom(collabAPIAtom);
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
     return isCollaborationLink(window.location.href);
   });
   const collabError = useAtomValue(collabErrorIndicatorAtom);
+
+
 
   useHandleLibrary({
     excalidrawAPI,
@@ -616,6 +655,10 @@ const ExcalidrawWrapper = () => {
       collabAPI.syncElements(elements);
     }
 
+    if (currentFileId) {
+        saveFile(currentFileId, elements, appState);
+    }
+
     // this check is redundant, but since this is a hot path, it's best
     // not to evaludate the nested expression every time
     if (!LocalData.isSavePaused()) {
@@ -773,20 +816,26 @@ const ExcalidrawWrapper = () => {
         autoFocus={true}
         theme={editorTheme}
         renderTopRightUI={(isMobile) => {
-          if (isMobile || !collabAPI || isCollabDisabled) {
+          const showCollab = !isMobile && collabAPI && !isCollabDisabled;
+
+          if (!showCollab) {
             return null;
           }
 
           return (
             <div className="excalidraw-ui-top-right">
-              {collabError.message && <CollabError collabError={collabError} />}
-              <LiveCollaborationTrigger
-                isCollaborating={isCollaborating}
-                onSelect={() =>
-                  setShareDialogState({ isOpen: true, type: "share" })
-                }
-                editorInterface={editorInterface}
-              />
+              {showCollab && (
+                <>
+                  {collabError.message && <CollabError collabError={collabError} />}
+                  <LiveCollaborationTrigger
+                    isCollaborating={isCollaborating}
+                    onSelect={() =>
+                      setShareDialogState({ isOpen: true, type: "share" })
+                    }
+                    editorInterface={editorInterface}
+                  />
+                </>
+              )}
             </div>
           );
         }}
@@ -854,7 +903,7 @@ const ExcalidrawWrapper = () => {
           }}
         />
 
-        <AppSidebar />
+        <AppSidebar onLoadFile={handleLoadFile} currentFileId={currentFileId} />
 
         {errorMessage && (
           <ErrorDialog onClose={() => setErrorMessage("")}>

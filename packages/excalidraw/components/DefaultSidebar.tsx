@@ -53,6 +53,16 @@ const DefaultTabTriggers = ({ children }: { children: React.ReactNode }) => {
 };
 DefaultTabTriggers.displayName = "DefaultTabTriggers";
 
+const DefaultSidebarContent = ({ children }: { children: React.ReactNode }) => {
+  const { DefaultSidebarContentTunnel } = useTunnels();
+  return (
+    <DefaultSidebarContentTunnel.In>
+      {children}
+    </DefaultSidebarContentTunnel.In>
+  );
+};
+DefaultSidebarContent.displayName = "DefaultSidebarContent";
+
 export const DefaultSidebar = Object.assign(
   withInternalFallback(
     "DefaultSidebar",
@@ -72,7 +82,7 @@ export const DefaultSidebar = Object.assign(
       const appState = useUIAppState();
       const setAppState = useExcalidrawSetAppState();
 
-      const { DefaultSidebarTabTriggersTunnel } = useTunnels();
+      const { DefaultSidebarTabTriggersTunnel, DefaultSidebarContentTunnel } = useTunnels();
 
       const isForceDocked = appState.openSidebar?.tab === CANVAS_SEARCH_TAB;
 
@@ -114,6 +124,7 @@ export const DefaultSidebar = Object.assign(
             <Sidebar.Tab tab={CANVAS_SEARCH_TAB}>
               <SearchMenu />
             </Sidebar.Tab>
+            <DefaultSidebarContentTunnel.Out />
             {children}
           </Sidebar.Tabs>
         </Sidebar>
@@ -123,5 +134,6 @@ export const DefaultSidebar = Object.assign(
   {
     Trigger: DefaultSidebarTrigger,
     TabTriggers: DefaultTabTriggers,
+    Content: DefaultSidebarContent,
   },
 );
