@@ -217,13 +217,14 @@ export const actionCopyAsPng = register({
         exportedElements,
         {
           ...appState,
-          exportScale: Math.max(window.devicePixelRatio, 3),
+          exportScale: Math.max(window.devicePixelRatio, 2),
         },
         app.files,
         {
           ...appState,
           exportingFrame,
           name: app.getName(),
+          exportPadding: 0,
         },
       );
       return {
@@ -258,6 +259,59 @@ export const actionCopyAsPng = register({
   },
   keyTest: (event) => event.code === CODES.C && event.altKey && event.shiftKey,
   keywords: ["png", "clipboard", "copy"],
+});
+
+export const actionExportPng = register({
+  name: "exportPng",
+  label: "labels.exportPng",
+  icon: pngIcon,
+  trackEvent: { category: "element" },
+  perform: async (elements, appState, _data, app) => {
+    if (!app.canvas) {
+      return {
+        captureUpdate: CaptureUpdateAction.EVENTUALLY,
+      };
+    }
+    const { exportedElements, exportingFrame } = prepareElementsForExport(
+      elements,
+      appState,
+      true,
+    );
+
+    try {
+      await exportCanvas(
+        "png",
+        exportedElements,
+        {
+          ...appState,
+          exportScale: Math.max(window.devicePixelRatio, 2),
+        },
+        app.files,
+        {
+          ...appState,
+          exportingFrame,
+          name: app.getName(),
+          exportPadding: 0,
+        },
+      );
+      return {
+        captureUpdate: CaptureUpdateAction.EVENTUALLY,
+      };
+    } catch (error: any) {
+      console.error(error);
+      return {
+        appState: {
+          ...appState,
+          errorMessage: error.message,
+        },
+        captureUpdate: CaptureUpdateAction.EVENTUALLY,
+      };
+    }
+  },
+  predicate: (elements) => {
+    return elements.length > 0;
+  },
+  keywords: ["png", "export", "save"],
 });
 
 export const copyText = register({

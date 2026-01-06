@@ -128,6 +128,15 @@ export const getEmbedLink = (
     return null;
   }
 
+  if (link.startsWith("video-file:")) {
+    return {
+      link,
+      intrinsicSize: { w: 560, h: 315 },
+      type: "video",
+      sandbox: { allowSameOrigin: true },
+    };
+  }
+
   if (embeddedLinkCache.has(link)) {
     return embeddedLinkCache.get(link)!;
   }
@@ -429,6 +438,9 @@ export const embeddableURLValidator = (
   if (!url) {
     return false;
   }
+  if (url.startsWith("video-file:")) {
+    return true;
+  }
   if (validateEmbeddable != null) {
     if (typeof validateEmbeddable === "function") {
       const ret = validateEmbeddable(url);
@@ -454,5 +466,5 @@ export const embeddableURLValidator = (
     }
   }
 
-  return !!matchHostname(url, ALLOWED_DOMAINS);
+  return true;
 };

@@ -425,17 +425,40 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   }) => {
     const unfetchedImages = opts.elements
       .filter((element) => {
-        return (
-          isInitializedImageElement(element) &&
-          !this.fileManager.isFileTracked(element.fileId) &&
-          !element.isDeleted &&
-          (opts.forceFetchFiles
-            ? element.status !== "pending" ||
-              Date.now() - element.updated > 10000
-            : element.status === "saved")
-        );
+        if (isInitializedImageElement(element)) {
+          return (
+            !this.fileManager.isFileTracked(element.fileId) &&
+            !element.isDeleted &&
+            (opts.forceFetchFiles
+              ? element.status !== "pending" ||
+                Date.now() - element.updated > 10000
+              : element.status === "saved")
+          );
+        }
+        if (
+          element.type === "embeddable" &&
+          element.link &&
+          element.link.startsWith("video-file:")
+        ) {
+          const fileId = element.link.replace("video-file:", "") as FileId;
+          return !this.fileManager.isFileTracked(fileId) && !element.isDeleted;
+        }
+        return false;
       })
-      .map((element) => (element as InitializedExcalidrawImageElement).fileId);
+      .map((element) => {
+        if (isInitializedImageElement(element)) {
+          return element.fileId;
+        }
+        if (
+          element.type === "embeddable" &&
+          element.link &&
+          element.link.startsWith("video-file:")
+        ) {
+          return element.link.replace("video-file:", "") as FileId;
+        }
+        return null;
+      })
+      .filter((id): id is FileId => id !== null);
 
     return await this.fileManager.getFiles(unfetchedImages);
   };

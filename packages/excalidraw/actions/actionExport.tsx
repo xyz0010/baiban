@@ -20,7 +20,7 @@ import { Tooltip } from "../components/Tooltip";
 import { ExportIcon, questionCircle, saveAs } from "../components/icons";
 import { loadFromJSON, saveAsJSON } from "../data";
 import { isImageFileHandle } from "../data/blob";
-import { nativeFileSystemSupported } from "../data/filesystem";
+import { nativeFileSystemSupported, fileSave } from "../data/filesystem";
 import { resaveAsImageWithScene } from "../data/resave";
 
 import { t } from "../i18n";
@@ -103,12 +103,10 @@ export const actionChangeExportScale = register<AppState["exportScale"]>({
   },
 });
 
-export const actionChangeExportBackground = register<
-  AppState["exportBackground"]
->({
+export const actionChangeExportBackground = register<boolean>({
   name: "changeExportBackground",
   label: "imageExportDialog.label.withBackground",
-  trackEvent: { category: "export", action: "toggleBackground" },
+  trackEvent: { category: "export", action: "background" },
   perform: (_elements, appState, value) => {
     return {
       appState: { ...appState, exportBackground: value },
@@ -125,11 +123,9 @@ export const actionChangeExportBackground = register<
   ),
 });
 
-export const actionChangeExportEmbedScene = register<
-  AppState["exportEmbedScene"]
->({
+export const actionChangeExportEmbedScene = register<boolean>({
   name: "changeExportEmbedScene",
-  label: "imageExportDialog.tooltip.embedScene",
+  label: "imageExportDialog.label.embedScene",
   trackEvent: { category: "export", action: "embedScene" },
   perform: (_elements, appState, value) => {
     return {
@@ -143,9 +139,6 @@ export const actionChangeExportEmbedScene = register<
       onChange={(checked) => updateData(checked)}
     >
       {t("imageExportDialog.label.embedScene")}
-      <Tooltip label={t("imageExportDialog.tooltip.embedScene")} long={true}>
-        <div className="excalidraw-tooltip-icon">{questionCircle}</div>
-      </Tooltip>
     </CheckboxItem>
   ),
 });
@@ -153,118 +146,75 @@ export const actionChangeExportEmbedScene = register<
 export const actionSaveToActiveFile = register({
   name: "saveToActiveFile",
   label: "buttons.save",
-  icon: ExportIcon,
-  trackEvent: { category: "export" },
-  predicate: (elements, appState, props, app) => {
-    return (
-      !!app.props.UIOptions.canvasActions.saveToActiveFile &&
-      !!appState.fileHandle &&
-      !appState.viewModeEnabled
+  trackEvent: { category: "export", action: "saveToActiveFile" },
+  perform: async (elements, appState, _, app) => {
+    const { fileHandle } = await saveAsJSON(
+      elements,
+      appState,
+      app.files,
+      appState.name || undefined,
     );
-  },
-  perform: async (elements, appState, value, app) => {
-    const fileHandleExists = !!appState.fileHandle;
-
-    try {
-      const { fileHandle } = isImageFileHandle(appState.fileHandle)
-        ? await resaveAsImageWithScene(
-            elements,
-            appState,
-            app.files,
-            app.getName(),
-          )
-        : await saveAsJSON(elements, appState, app.files, app.getName());
-
-      return {
-        captureUpdate: CaptureUpdateAction.EVENTUALLY,
-        appState: {
-          ...appState,
-          fileHandle,
-          toast: fileHandleExists
-            ? {
-                message: fileHandle?.name
-                  ? t("toast.fileSavedToFilename").replace(
-                      "{filename}",
-                      `"${fileHandle.name}"`,
-                    )
-                  : t("toast.fileSaved"),
-              }
-            : null,
-        },
-      };
-    } catch (error: any) {
-      if (error?.name !== "AbortError") {
-        console.error(error);
-      } else {
-        console.warn(error);
-      }
-      return { captureUpdate: CaptureUpdateAction.EVENTUALLY };
-    }
+    return {
+      commitToHistory: false,
+      appState: {
+        ...appState,
+        fileHandle,
+        toast: fileHandle
+          ? {
+              message: fileHandle.name
+                ? t("toast.fileSavedToFilename").replace(
+                    "{filename}",
+                    `"${fileHandle.name}"`,
+                  )
+                : t("toast.fileSaved"),
+            }
+          : null,
+      },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    };
   },
   keyTest: (event) =>
-    event.key === KEYS.S && event[KEYS.CTRL_OR_CMD] && !event.shiftKey,
+    event.key === KEYS.S && (event.ctrlKey || event.metaKey) && !event.shiftKey,
 });
 
 export const actionSaveFileToDisk = register({
   name: "saveFileToDisk",
-  label: "exportDialog.disk_title",
-  icon: ExportIcon,
-  viewMode: true,
-  trackEvent: { category: "export" },
-  perform: async (elements, appState, value, app) => {
-    try {
-      const { fileHandle } = await saveAsJSON(
-        elements,
-        {
-          ...appState,
-          fileHandle: null,
-        },
-        app.files,
-        app.getName(),
-      );
-      return {
-        captureUpdate: CaptureUpdateAction.EVENTUALLY,
-        appState: {
-          ...appState,
-          openDialog: null,
-          fileHandle,
-          toast: { message: t("toast.fileSaved") },
-        },
-      };
-    } catch (error: any) {
-      if (error?.name !== "AbortError") {
-        console.error(error);
-      } else {
-        console.warn(error);
-      }
-      return { captureUpdate: CaptureUpdateAction.EVENTUALLY };
-    }
+  label: "buttons.saveAs",
+  trackEvent: { category: "export", action: "saveFileToDisk" },
+  perform: async (elements, appState, _, app) => {
+    const { fileHandle } = await saveAsJSON(
+      elements,
+      { ...appState, fileHandle: null },
+      app.files,
+      appState.name || undefined,
+    );
+    return {
+      commitToHistory: false,
+      appState: {
+        ...appState,
+        fileHandle,
+        toast: fileHandle
+          ? {
+              message: fileHandle.name
+                ? t("toast.fileSavedToFilename").replace(
+                    "{filename}",
+                    `"${fileHandle.name}"`,
+                  )
+                : t("toast.fileSaved"),
+            }
+          : null,
+      },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    };
   },
   keyTest: (event) =>
-    event.key === KEYS.S && event.shiftKey && event[KEYS.CTRL_OR_CMD],
-  PanelComponent: ({ updateData }) => (
-    <ToolButton
-      type="button"
-      icon={saveAs}
-      title={t("buttons.saveAs")}
-      aria-label={t("buttons.saveAs")}
-      showAriaLabel={useEditorInterface().formFactor === "phone"}
-      hidden={!nativeFileSystemSupported}
-      onClick={() => updateData(null)}
-      data-testid="save-as-button"
-    />
-  ),
+    event.key === KEYS.S && (event.ctrlKey || event.metaKey) && event.shiftKey,
 });
 
 export const actionLoadScene = register({
   name: "loadScene",
   label: "buttons.load",
-  trackEvent: { category: "export" },
-  predicate: (elements, appState, props, app) => {
-    return (
-      !!app.props.UIOptions.canvasActions.loadScene && !appState.viewModeEnabled
-    );
-  },
+  trackEvent: { category: "export", action: "load" },
   perform: async (elements, appState, _, app) => {
     try {
       const {
@@ -276,52 +226,71 @@ export const actionLoadScene = register({
         elements: loadedElements,
         appState: loadedAppState,
         files,
+        commitToHistory: false,
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       };
     } catch (error: any) {
-      if (error?.name === "AbortError") {
-        console.warn(error);
-        return false;
+      if (error.name !== "AbortError") {
+        console.error(error);
       }
-      return {
-        elements,
-        appState: { ...appState, errorMessage: error.message },
-        files: app.files,
-        captureUpdate: CaptureUpdateAction.EVENTUALLY,
-      };
+      return { captureUpdate: CaptureUpdateAction.NEVER };
     }
   },
-  keyTest: (event) => event[KEYS.CTRL_OR_CMD] && event.key === KEYS.O,
+  keyTest: (event) =>
+    event.key === KEYS.O && (event.ctrlKey || event.metaKey) && !event.shiftKey,
 });
 
-export const actionExportWithDarkMode = register<
-  AppState["exportWithDarkMode"]
->({
-  name: "exportWithDarkMode",
-  label: "imageExportDialog.label.darkMode",
-  trackEvent: { category: "export", action: "toggleTheme" },
-  perform: (_elements, appState, value) => {
+export const actionExportVideo = register({
+  name: "exportVideo",
+  label: "buttons.exportVideo",
+  trackEvent: { category: "element", action: "exportVideo" },
+  perform: (elements, appState, _, app) => {
+    const selectedElements = getSelectedElements(elements, appState);
+    if (selectedElements.length !== 1) {
+      return { appState, captureUpdate: CaptureUpdateAction.NEVER };
+    }
+    const element = selectedElements[0];
+    if (
+      element.type !== "embeddable" ||
+      !element.link ||
+      !element.link.startsWith("video-file:")
+    ) {
+      return { appState, captureUpdate: CaptureUpdateAction.NEVER };
+    }
+
+    const fileId = element.link.replace("video-file:", "");
+    const fileData = app.files[fileId];
+    if (!fileData || !fileData.dataURL) {
+      return { appState, captureUpdate: CaptureUpdateAction.NEVER };
+    }
+
+    fetch(fileData.dataURL)
+      .then((res) => res.blob())
+      .then((blob) => {
+        fileSave(blob, {
+          name: "video",
+          extension: "mp4",
+          description: "Export Video",
+          mimeTypes: [fileData.mimeType],
+        });
+      });
+
     return {
-      appState: { ...appState, exportWithDarkMode: value },
-      captureUpdate: CaptureUpdateAction.EVENTUALLY,
+      appState,
+      captureUpdate: CaptureUpdateAction.NEVER,
     };
   },
-  PanelComponent: ({ appState, updateData }) => (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        marginTop: "-45px",
-        marginBottom: "10px",
-      }}
-    >
-      <DarkModeToggle
-        value={appState.exportWithDarkMode ? THEME.DARK : THEME.LIGHT}
-        onChange={(theme: Theme) => {
-          updateData(theme === THEME.DARK);
-        }}
-        title={t("imageExportDialog.label.darkMode")}
-      />
-    </div>
-  ),
+  contextItemLabel: "buttons.exportVideo",
+  predicate: (elements, appState) => {
+    const selectedElements = getSelectedElements(elements, appState);
+    if (selectedElements.length !== 1) {
+      return false;
+    }
+    const element = selectedElements[0];
+    return (
+      element.type === "embeddable" &&
+      !!element.link &&
+      element.link.startsWith("video-file:")
+    );
+  },
 });

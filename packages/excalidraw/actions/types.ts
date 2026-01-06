@@ -43,11 +43,13 @@ export type UpdaterFn = (res: ActionResult) => void;
 export type ActionFilterFn = (action: Action) => void;
 
 export type ActionName =
+  | "exportVideo"
   | "copy"
   | "cut"
   | "paste"
   | "copyAsPng"
   | "copyAsSvg"
+  | "exportPng"
   | "copyText"
   | "sendBackward"
   | "bringForward"
@@ -78,6 +80,7 @@ export type ActionName =
   | "changeProjectName"
   | "changeExportBackground"
   | "changeExportEmbedScene"
+  | "exportWithDarkMode"
   | "changeExportScale"
   | "saveToActiveFile"
   | "saveFileToDisk"

@@ -41,7 +41,10 @@ export {
   actionSaveToActiveFile,
   actionSaveFileToDisk,
   actionLoadScene,
+  actionExportVideo,
 } from "./actionExport";
+
+export { actionExportWithDarkMode } from "./actionExportWithDarkMode";
 
 export { actionCopyStyles, actionPasteStyles } from "./actionStyles";
 export { actionShortcuts } from "./actionMenu";
@@ -73,6 +76,7 @@ export {
   actionCut,
   actionCopyAsPng,
   actionCopyAsSvg,
+  actionExportPng,
   copyText,
 } from "./actionClipboard";
 

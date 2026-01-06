@@ -93,16 +93,27 @@ export class FileManager {
     const addedFiles: Map<FileId, BinaryFileData> = new Map();
 
     for (const element of elements) {
-      const fileData =
-        isInitializedImageElement(element) && files[element.fileId];
+      let fileId: FileId | null = null;
+      if (isInitializedImageElement(element)) {
+        fileId = element.fileId;
+      } else if (
+        element.type === "embeddable" &&
+        element.link &&
+        element.link.startsWith("video-file:")
+      ) {
+        fileId = element.link.replace("video-file:", "") as FileId;
+      }
+
+      const fileData = fileId && files[fileId];
 
       if (
+        fileId &&
         fileData &&
         // NOTE if errored during save, won't retry due to this check
         !this.isFileSavedOrBeingSaved(fileData)
       ) {
-        addedFiles.set(element.fileId, files[element.fileId]);
-        this.savingFiles.set(element.fileId, this.getFileVersion(fileData));
+        addedFiles.set(fileId, files[fileId]);
+        this.savingFiles.set(fileId, this.getFileVersion(fileData));
       }
     }
 
@@ -173,11 +184,21 @@ export class FileManager {
    */
   shouldPreventUnload = (elements: readonly ExcalidrawElement[]) => {
     return elements.some((element) => {
-      return (
-        isInitializedImageElement(element) &&
-        !element.isDeleted &&
-        this.savingFiles.has(element.fileId)
-      );
+      if (element.isDeleted) {
+        return false;
+      }
+      if (isInitializedImageElement(element)) {
+        return this.savingFiles.has(element.fileId);
+      }
+      if (
+        element.type === "embeddable" &&
+        element.link &&
+        element.link.startsWith("video-file:")
+      ) {
+        const fileId = element.link.replace("video-file:", "") as FileId;
+        return this.savingFiles.has(fileId);
+      }
+      return false;
     });
   };
 

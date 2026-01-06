@@ -12,12 +12,12 @@ import {
 import type { NonDeletedExcalidrawElement } from "@excalidraw/element/types";
 
 import {
-  actionExportWithDarkMode,
   actionChangeExportBackground,
   actionChangeExportEmbedScene,
   actionChangeExportScale,
   actionChangeProjectName,
 } from "../actions/actionExport";
+import { actionExportWithDarkMode } from "../actions/actionExportWithDarkMode";
 import { probablySupportsClipboardBlob } from "../clipboard";
 import { prepareElementsForExport } from "../data";
 import { canvasToBlob } from "../data/blob";

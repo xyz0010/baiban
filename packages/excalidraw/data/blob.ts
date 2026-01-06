@@ -96,6 +96,8 @@ export const getMimeType = (blob: Blob | string): string => {
     return MIME_TYPES.svg;
   } else if (/\.excalidrawlib$/.test(name)) {
     return MIME_TYPES.excalidrawlib;
+  } else if (/\.mp4$/.test(name)) {
+    return "video/mp4";
   }
   return "";
 };

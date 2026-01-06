@@ -9,6 +9,7 @@
     "cut": "Cut",
     "copy": "Copy",
     "copyAsPng": "Copy to clipboard as PNG",
+    "exportPng": "Export PNG",
     "copyAsSvg": "Copy to clipboard as SVG",
     "copyText": "Copy to clipboard as text",
     "copySource": "Copy source to clipboard",

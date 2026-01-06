@@ -360,10 +360,15 @@ const ExcalidrawWrapper = () => {
       try {
         const files = await getFilesMetadata();
         if (files.length > 0) {
-            // files exist
+            // Load the most recently modified file
+            const mostRecentFile = files.reduce((prev, current) =>
+                (prev.lastModified > current.lastModified) ? prev : current
+            );
+            handleLoadFile(mostRecentFile.id);
         } else {
             // Create a default file if none exists
-            await createNewFile();
+            const newFile = await createNewFile();
+            handleLoadFile(newFile.id);
         }
       } catch (e) {
         console.error("Error initializing files", e);
@@ -459,6 +464,15 @@ const ExcalidrawWrapper = () => {
           data.scene.elements?.reduce((acc, element) => {
             if (isInitializedImageElement(element)) {
               return acc.concat(element.fileId);
+            }
+            if (
+              element.type === "embeddable" &&
+              element.link &&
+              element.link.startsWith("video-file:")
+            ) {
+              return acc.concat(
+                element.link.replace("video-file:", "") as FileId,
+              );
             }
             return acc;
           }, [] as FileId[]) || [];
@@ -566,6 +580,19 @@ const ExcalidrawWrapper = () => {
                 !currFiles[element.fileId]
               ) {
                 return acc.concat(element.fileId);
+              }
+              if (
+                element.type === "embeddable" &&
+                element.link &&
+                element.link.startsWith("video-file:")
+              ) {
+                const fileId = element.link.replace(
+                  "video-file:",
+                  "",
+                ) as FileId;
+                if (!currFiles[fileId]) {
+                  return acc.concat(fileId);
+                }
               }
               return acc;
             }, [] as FileId[]) || [];
@@ -689,6 +716,27 @@ const ExcalidrawWrapper = () => {
           }
         }
       });
+
+      // Flush save for video files to prevent data loss on refresh/unload
+      // since video files are larger and might be lost if IDB is killed during unload
+      const hasUnsavedVideo = elements.some((element) => {
+        if (
+          element.type === "embeddable" &&
+          element.link &&
+          element.link.startsWith("video-file:")
+        ) {
+          const fileId = element.link.replace("video-file:", "") as FileId;
+          const file = files[fileId];
+          return (
+            file && !LocalData.fileStorage.isFileSavedOrBeingSaved(file)
+          );
+        }
+        return false;
+      });
+
+      if (hasUnsavedVideo) {
+        LocalData.flushSave();
+      }
     }
 
     // Render the debug scene if the debug canvas is available

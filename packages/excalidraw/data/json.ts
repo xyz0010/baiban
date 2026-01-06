@@ -38,6 +38,17 @@ const filterOutDeletedFiles = (
     ) {
       nextFiles[element.fileId] = files[element.fileId];
     }
+    if (
+      !element.isDeleted &&
+      element.type === "embeddable" &&
+      element.link &&
+      element.link.startsWith("video-file:")
+    ) {
+      const fileId = element.link.replace("video-file:", "");
+      if (files[fileId]) {
+        nextFiles[fileId] = files[fileId];
+      }
+    }
   }
   return nextFiles;
 };

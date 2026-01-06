@@ -241,6 +241,7 @@ export const IMAGE_MIME_TYPES = {
   ico: "image/x-icon",
   avif: "image/avif",
   jfif: "image/jfif",
+  mp4: "video/mp4",
 } as const;
 
 export const STRING_MIME_TYPES = {

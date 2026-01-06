@@ -289,6 +289,8 @@ import {
   actionBringToFront,
   actionCopy,
   actionCopyAsPng,
+  actionExportPng,
+  actionExportVideo,
   actionCopyAsSvg,
   copyText,
   actionCopyStyles,
@@ -1318,7 +1320,16 @@ class App extends React.Component<AppProps, AppState> {
     this.scene.getNonDeletedElements().filter((element) => {
       if (isEmbeddableElement(element)) {
         iframeLikes.add(element.id);
-        if (!this.embedsValidationStatus.has(element.id)) {
+
+        // Explicitly validate video-file links to ensure they render
+        if (
+          element.link &&
+          element.link.startsWith("video-file:") &&
+          this.embedsValidationStatus.get(element.id) !== true
+        ) {
+          this.updateEmbedValidationStatus(element, true);
+          updated = true;
+        } else if (!this.embedsValidationStatus.has(element.id)) {
           updated = true;
 
           const validated = embeddableURLValidator(
@@ -1600,31 +1611,68 @@ class App extends React.Component<AppProps, AppState> {
                     padding: `${el.strokeWidth}px`,
                   }}
                 >
-                  {(isEmbeddableElement(el)
-                    ? this.props.renderEmbeddable?.(el, this.state)
-                    : null) ?? (
-                    <iframe
-                      ref={(ref) => this.cacheEmbeddableRef(el, ref)}
-                      className="excalidraw__embeddable"
-                      srcDoc={
-                        src?.type === "document"
-                          ? src.srcdoc(this.state.theme)
-                          : undefined
+                  {el.link && el.link.startsWith("video-file:") ? (
+                    (() => {
+                      const fileId = el.link.replace("video-file:", "");
+                      const file = this.files[fileId];
+                      if (!file) {
+                        return (
+                          <div
+                            style={{
+                              padding: "10px",
+                              color: "red",
+                              background: "white",
+                            }}
+                          >
+                            Video file not found: {fileId}
+                          </div>
+                        );
                       }
-                      src={
-                        src?.type !== "document" ? src?.link ?? "" : undefined
-                      }
-                      // https://stackoverflow.com/q/18470015
-                      scrolling="no"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      title="Excalidraw Embedded Content"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen={true}
-                      sandbox={`${
-                        src?.sandbox?.allowSameOrigin ? "allow-same-origin" : ""
-                      } allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
-                    />
-                  )}
+                      return (
+                        <video
+                          className="excalidraw__embeddable"
+                          src={file.dataURL}
+                          controls
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            backgroundColor: "#000",
+                            display: "block",
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        />
+                      );
+                    })()
+                  ) : (
+                    (isEmbeddableElement(el)
+                      ? this.props.renderEmbeddable?.(el, this.state)
+                      : null) ?? (
+                      <iframe
+                        ref={(ref) => this.cacheEmbeddableRef(el, ref)}
+                        className="excalidraw__embeddable"
+                        srcDoc={
+                          src?.type === "document"
+                            ? src.srcdoc(this.state.theme)
+                            : undefined
+                        }
+                        src={
+                          src?.type !== "document" ? src?.link ?? "" : undefined
+                        }
+                        // https://stackoverflow.com/q/18470015
+                        scrolling="no"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        title="Excalidraw Embedded Content"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen={true}
+                        sandbox={`${
+                          src?.sandbox?.allowSameOrigin
+                            ? "allow-same-origin"
+                            : ""
+                        } allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
+                      />
+                    ))}
                 </div>
               </div>
             </div>
@@ -11324,6 +11372,127 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
+  private initializeVideo = async (
+    placeholder: ExcalidrawElement,
+    videoFile: File,
+  ) => {
+    const fileId = await ((this.props.generateIdForFile?.(
+      videoFile,
+    ) as Promise<FileId>) || generateIdFromFile(videoFile));
+
+    if (!fileId) {
+      throw new Error(t("errors.imageInsertError"));
+    }
+
+    if (videoFile.size > MAX_ALLOWED_FILE_BYTES) {
+      throw new Error(
+        t("errors.fileTooBig", {
+          maxSize: `${Math.trunc(MAX_ALLOWED_FILE_BYTES / 1024 / 1024)}MB`,
+        }),
+      );
+    }
+
+    const dataURL =
+      this.files[fileId]?.dataURL || (await getDataURL(videoFile));
+
+    this.addMissingFiles([
+      {
+        mimeType: (videoFile.type || "video/mp4") as BinaryFileData["mimeType"],
+        id: fileId,
+        dataURL,
+        created: Date.now(),
+        lastRetrieved: Date.now(),
+      },
+    ]);
+
+    const newElement = newElementWith(placeholder, {
+      type: "embeddable",
+      link: `video-file:${fileId}`,
+      isDeleted: false,
+    }) as ExcalidrawEmbeddableElement;
+
+    this.updateEmbedValidationStatus(newElement, true);
+
+    return newElement;
+  };
+
+  private insertVideos = async (
+    videoFiles: File[],
+    sceneX: number,
+    sceneY: number,
+  ) => {
+    const gridPadding = 50 / this.state.zoom.value;
+    const placeholders = positionElementsOnGrid(
+      videoFiles.map(() => {
+        return newEmbeddableElement({
+          type: "embeddable",
+          x: sceneX,
+          y: sceneY,
+          width: 560,
+          height: 315,
+        });
+      }),
+      sceneX,
+      sceneY,
+      gridPadding,
+    );
+    placeholders.forEach((el) => this.scene.insertElement(el));
+
+    const initialized = await Promise.all(
+      placeholders.map(async (placeholder, i) => {
+        try {
+          return await this.initializeVideo(placeholder, videoFiles[i]);
+        } catch (error: any) {
+          this.setState({
+            errorMessage: error.message || "Video insert error",
+          });
+          return newElementWith(placeholder, { isDeleted: true });
+        }
+      }),
+    );
+
+    const initializedMap = arrayToMap(initialized);
+
+    const positioned = positionElementsOnGrid(
+      initialized.filter((el) => !el.isDeleted),
+      sceneX,
+      sceneY,
+      gridPadding,
+    );
+    
+    // Ensure validation status is set for positioned elements
+    positioned.forEach((el) => {
+      if (
+        isEmbeddableElement(el) &&
+        el.link &&
+        el.link.startsWith("video-file:")
+      ) {
+        this.updateEmbedValidationStatus(el, true);
+      }
+    });
+
+    const positionedMap = arrayToMap(positioned);
+
+    const nextElements = this.scene
+      .getElementsIncludingDeleted()
+      .map((el) => positionedMap.get(el.id) ?? initializedMap.get(el.id) ?? el);
+
+    this.updateScene({
+      appState: {
+        selectedElementIds: makeNextSelectedElementIds(
+          Object.fromEntries(positioned.map((el) => [el.id, true])),
+          this.state,
+        ),
+      },
+      elements: nextElements,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+
+    this.setState({}, () => {
+      this.actionManager.executeAction(actionFinalize);
+    });
+  };
+
   private handleAppOnDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
       event,
@@ -11365,6 +11534,19 @@ class App extends React.Component<AppProps, AppState> {
           // if EncodingError, fall through to insert as regular image
         }
       }
+    }
+
+    const videoFiles = fileItems
+      .map((data) => data.file)
+      .filter(
+        (file) =>
+          file.type === "video/mp4" ||
+          file.name.toLowerCase().endsWith(".mp4"),
+      );
+
+    if (videoFiles.length > 0) {
+      this.insertVideos(videoFiles, sceneX, sceneY);
+      return;
     }
 
     const imageFiles = fileItems
@@ -11945,7 +12127,7 @@ class App extends React.Component<AppProps, AppState> {
   ): ContextMenuItems => {
     const options: ContextMenuItems = [];
 
-    options.push(actionCopyAsPng, actionCopyAsSvg);
+    options.push(actionCopyAsPng, actionExportPng, actionExportVideo, actionCopyAsSvg);
 
     // canvas contextMenu
     // -------------------------------------------------------------------------
@@ -11965,6 +12147,7 @@ class App extends React.Component<AppProps, AppState> {
         actionPaste,
         CONTEXT_MENU_SEPARATOR,
         actionCopyAsPng,
+        actionExportPng,
         actionCopyAsSvg,
         copyText,
         CONTEXT_MENU_SEPARATOR,
