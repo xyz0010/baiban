@@ -1,6 +1,7 @@
 import React from "react";
 import { DefaultSidebar } from "@excalidraw/excalidraw/components/DefaultSidebar";
 import { Sidebar } from "@excalidraw/excalidraw/components/Sidebar/Sidebar";
+
 import { FileListSidebar } from "./FileListSidebar";
 
 interface Props {
@@ -13,12 +14,21 @@ export const AppSidebar = ({ onLoadFile, currentFileId }: Props) => {
     <>
       <DefaultSidebar.Content>
         <Sidebar.Tab tab="file-list">
-          <FileListSidebar onLoadFile={onLoadFile} currentFileId={currentFileId} />
+          <FileListSidebar
+            onLoadFile={onLoadFile}
+            currentFileId={currentFileId}
+          />
         </Sidebar.Tab>
       </DefaultSidebar.Content>
       <DefaultSidebar.TabTriggers>
         <Sidebar.TabTrigger tab="file-list" title="My Files">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <svg
               viewBox="0 0 24 24"
               width="24"

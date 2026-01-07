@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { getFilesMetadata, createNewFile, deleteFile, renameFile, LocalFileMetadata } from "../data/LocalFileStorage";
-import { t } from "@excalidraw/excalidraw/i18n";
 import ConfirmDialog from "@excalidraw/excalidraw/components/ConfirmDialog";
+
+import {
+  getFilesMetadata,
+  createNewFile,
+  deleteFile,
+  renameFile,
+  type LocalFileMetadata,
+} from "../data/LocalFileStorage";
+
 import "./FileListSidebar.scss";
 
 interface Props {
@@ -13,7 +20,9 @@ export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
   const [files, setFiles] = useState<LocalFileMetadata[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [fileToDelete, setFileToDelete] = useState<LocalFileMetadata | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<LocalFileMetadata | null>(
+    null,
+  );
 
   const refreshFiles = async () => {
     const metadata = await getFilesMetadata();
@@ -37,18 +46,18 @@ export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
 
   const confirmDelete = async () => {
     if (fileToDelete) {
-        await deleteFile(fileToDelete.id);
-        await refreshFiles();
-        
-        if (currentFileId === fileToDelete.id) {
-            const remaining = await getFilesMetadata();
-            if (remaining.length > 0) {
-                onLoadFile(remaining[0].id);
-            } else {
-                handleCreate();
-            }
+      await deleteFile(fileToDelete.id);
+      await refreshFiles();
+
+      if (currentFileId === fileToDelete.id) {
+        const remaining = await getFilesMetadata();
+        if (remaining.length > 0) {
+          onLoadFile(remaining[0].id);
+        } else {
+          handleCreate();
         }
-        setFileToDelete(null);
+      }
+      setFileToDelete(null);
     }
   };
 
@@ -70,7 +79,9 @@ export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
     <div className="file-list-sidebar-content">
       <div className="file-list-header">
         <h3>My Files</h3>
-        <button onClick={handleCreate} className="create-btn" title="New File">+</button>
+        <button onClick={handleCreate} className="create-btn" title="New File">
+          +
+        </button>
       </div>
       <div className="file-list">
         {files.map((file) => (
@@ -90,18 +101,25 @@ export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
               />
             ) : (
               <div className="file-info">
-                <span className="file-name" title={file.name}>{file.name}</span>
-                <span className="file-date">{new Date(file.createdAt).toLocaleString()}</span>
+                <span className="file-name" title={file.name}>
+                  {file.name}
+                </span>
+                <span className="file-date">
+                  {new Date(file.createdAt).toLocaleString()}
+                </span>
               </div>
             )}
             <div className="file-actions">
-                <button onClick={(e) => startRenaming(e, file)} title="Rename">✎</button>
-                <button 
-                  onClick={(e) => handleDelete(e, file)} 
-                  title="Delete"
-                >
-                  🗑️
-                </button>
+              <button onClick={(e) => startRenaming(e, file)} title="Rename">
+                ✎
+              </button>
+              <button
+                onClick={(e) => handleDelete(e, file)}
+                className="delete-btn"
+                title="Delete"
+              >
+                ×
+              </button>
             </div>
           </div>
         ))}

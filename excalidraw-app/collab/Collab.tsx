@@ -37,7 +37,6 @@ import type { ImportedDataState } from "@excalidraw/excalidraw/data/types";
 import type {
   ExcalidrawElement,
   FileId,
-  InitializedExcalidrawImageElement,
   OrderedExcalidrawElement,
 } from "@excalidraw/element/types";
 import type {

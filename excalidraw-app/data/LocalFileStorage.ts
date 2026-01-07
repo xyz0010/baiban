@@ -1,13 +1,15 @@
 import { createStore, get, set, del, entries } from "idb-keyval";
-import { ExcalidrawElement } from "@excalidraw/element/types";
-import { AppState } from "@excalidraw/excalidraw/types";
+
 import { clearAppStateForLocalStorage } from "@excalidraw/excalidraw/appState";
+
 import { randomId } from "@excalidraw/common";
+
+import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { AppState } from "@excalidraw/excalidraw/types";
 
 const filesStore = createStore("excalidraw-content-db", "files-store");
 const metadataStore = createStore("excalidraw-meta-db", "metadata-store");
 const deletedFiles = new Set<string>();
-
 
 export interface LocalFileMetadata {
   id: string;
@@ -23,53 +25,66 @@ export interface LocalFileData {
 
 export const getFilesMetadata = async (): Promise<LocalFileMetadata[]> => {
   const metadata = await entries(metadataStore);
-  return metadata.map(([_, value]) => value as LocalFileMetadata).sort((a, b) => b.createdAt - a.createdAt);
+  return metadata
+    .map(([_, value]) => value as LocalFileMetadata)
+    .sort((a, b) => b.createdAt - a.createdAt);
 };
 
-export const saveFile = async (id: string, elements: readonly ExcalidrawElement[], appState: Partial<AppState>, name?: string) => {
+export const saveFile = async (
+  id: string,
+  elements: readonly ExcalidrawElement[],
+  appState: Partial<AppState>,
+  name?: string,
+) => {
   if (deletedFiles.has(id)) {
-      return;
+    return;
   }
   const now = Date.now();
   let metadata: LocalFileMetadata | undefined = await get(id, metadataStore);
-  
+
   if (!metadata) {
     return;
-  } else {
-    metadata = {
-      ...metadata,
-      lastModified: now,
-    };
-    if (name) {
-      metadata.name = name;
-    }
+  }
+
+  metadata = {
+    ...metadata,
+    lastModified: now,
+  };
+  if (name) {
+    metadata.name = name;
   }
 
   if (deletedFiles.has(id)) {
-      return;
+    return;
   }
 
   await set(id, metadata, metadataStore);
-  await set(id, { elements, appState: clearAppStateForLocalStorage(appState) }, filesStore);
+  await set(
+    id,
+    { elements, appState: clearAppStateForLocalStorage(appState) },
+    filesStore,
+  );
   return metadata;
 };
 
 export const createNewFile = async (name: string = "Untitled") => {
-    const id = randomId();
-    const now = Date.now();
-    const metadata: LocalFileMetadata = {
-        id,
-        name,
-        lastModified: now,
-        createdAt: now,
-    };
-    // Initialize with empty data
-    await set(id, metadata, metadataStore);
-    await set(id, { elements: [], appState: {} }, filesStore);
-    return metadata;
-}
+  const id = randomId();
+  const now = Date.now();
+  const metadata: LocalFileMetadata = {
+    id,
+    name,
+    lastModified: now,
+    createdAt: now,
+  };
+  // Initialize with empty data
+  await set(id, metadata, metadataStore);
+  await set(id, { elements: [], appState: {} }, filesStore);
+  return metadata;
+};
 
-export const loadFile = async (id: string): Promise<LocalFileData | undefined> => {
+export const loadFile = async (
+  id: string,
+): Promise<LocalFileData | undefined> => {
   return await get(id, filesStore);
 };
 
@@ -80,10 +95,10 @@ export const deleteFile = async (id: string) => {
 };
 
 export const renameFile = async (id: string, newName: string) => {
-    const metadata: LocalFileMetadata | undefined = await get(id, metadataStore);
-    if (metadata) {
-        metadata.name = newName;
-        metadata.lastModified = Date.now();
-        await set(id, metadata, metadataStore);
-    }
-}
+  const metadata: LocalFileMetadata | undefined = await get(id, metadataStore);
+  if (metadata) {
+    metadata.name = newName;
+    metadata.lastModified = Date.now();
+    await set(id, metadata, metadataStore);
+  }
+};

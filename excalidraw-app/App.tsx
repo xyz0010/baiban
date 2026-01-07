@@ -6,8 +6,6 @@ import {
   reconcileElements,
   useEditorInterface,
 } from "@excalidraw/excalidraw";
-import { DefaultSidebar } from "@excalidraw/excalidraw/components/DefaultSidebar";
-import { Sidebar } from "@excalidraw/excalidraw/components/Sidebar/Sidebar";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 import {
@@ -126,7 +124,12 @@ import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 import "./index.scss";
 
 import { AppSidebar } from "./components/AppSidebar";
-import { saveFile, loadFile, getFilesMetadata, createNewFile } from "./data/LocalFileStorage";
+import {
+  saveFile,
+  loadFile,
+  getFilesMetadata,
+  createNewFile,
+} from "./data/LocalFileStorage";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -340,42 +343,47 @@ const ExcalidrawWrapper = () => {
   const [excalidrawAPI, excalidrawRefCallback] =
     useCallbackRefState<ExcalidrawImperativeAPI>();
 
-  const handleLoadFile = async (id: string) => {
-    const fileData = await loadFile(id);
-    if (fileData && excalidrawAPI) {
-      setCurrentFileId(id);
-      excalidrawAPI.updateScene({
-        elements: fileData.elements,
-        appState: fileData.appState as any,
-        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-      });
-    }
-  };
+  const handleLoadFile = useCallback(
+    async (id: string) => {
+      const fileData = await loadFile(id);
+      if (fileData && excalidrawAPI) {
+        setCurrentFileId(id);
+        excalidrawAPI.updateScene({
+          elements: fileData.elements,
+          appState: fileData.appState as any,
+          captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+        });
+      }
+    },
+    [excalidrawAPI],
+  );
 
   useEffect(() => {
     const initFile = async () => {
       // Only init if we have the API and not collaborating
-      if (!excalidrawAPI) return;
-      
+      if (!excalidrawAPI) {
+        return;
+      }
+
       try {
         const files = await getFilesMetadata();
         if (files.length > 0) {
-            // Load the most recently modified file
-            const mostRecentFile = files.reduce((prev, current) =>
-                (prev.lastModified > current.lastModified) ? prev : current
-            );
-            handleLoadFile(mostRecentFile.id);
+          // Load the most recently modified file
+          const mostRecentFile = files.reduce((prev, current) =>
+            prev.lastModified > current.lastModified ? prev : current,
+          );
+          handleLoadFile(mostRecentFile.id);
         } else {
-            // Create a default file if none exists
-            const newFile = await createNewFile();
-            handleLoadFile(newFile.id);
+          // Create a default file if none exists
+          const newFile = await createNewFile();
+          handleLoadFile(newFile.id);
         }
       } catch (e) {
         console.error("Error initializing files", e);
       }
     };
     initFile();
-  }, [excalidrawAPI]);
+  }, [excalidrawAPI, handleLoadFile]);
 
   // initial state
   // ---------------------------------------------------------------------------
@@ -404,8 +412,6 @@ const ExcalidrawWrapper = () => {
     return isCollaborationLink(window.location.href);
   });
   const collabError = useAtomValue(collabErrorIndicatorAtom);
-
-
 
   useHandleLibrary({
     excalidrawAPI,
@@ -683,7 +689,7 @@ const ExcalidrawWrapper = () => {
     }
 
     if (currentFileId) {
-        saveFile(currentFileId, elements, appState);
+      saveFile(currentFileId, elements, appState);
     }
 
     // this check is redundant, but since this is a hot path, it's best
@@ -727,9 +733,7 @@ const ExcalidrawWrapper = () => {
         ) {
           const fileId = element.link.replace("video-file:", "") as FileId;
           const file = files[fileId];
-          return (
-            file && !LocalData.fileStorage.isFileSavedOrBeingSaved(file)
-          );
+          return file && !LocalData.fileStorage.isFileSavedOrBeingSaved(file);
         }
         return false;
       });
@@ -874,7 +878,9 @@ const ExcalidrawWrapper = () => {
             <div className="excalidraw-ui-top-right">
               {showCollab && (
                 <>
-                  {collabError.message && <CollabError collabError={collabError} />}
+                  {collabError.message && (
+                    <CollabError collabError={collabError} />
+                  )}
                   <LiveCollaborationTrigger
                     isCollaborating={isCollaborating}
                     onSelect={() =>
