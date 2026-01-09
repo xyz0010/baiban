@@ -279,6 +279,18 @@ export const editGroupForSelectedElement = (
   };
 };
 
+export const isElementInCollapsedGroup = (
+  element: ExcalidrawElement,
+  appState: { collapsedGroupIds?: AppState["collapsedGroupIds"] },
+) => {
+  if (element.groupIds.length === 0) {
+    return false;
+  }
+
+  return element.groupIds.some((groupId) => appState.collapsedGroupIds?.[groupId]);
+};
+
+
 export const isElementInGroup = (element: ExcalidrawElement, groupId: string) =>
   element.groupIds.includes(groupId);
 

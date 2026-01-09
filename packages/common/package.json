@@ -55,5 +55,9 @@
   "scripts": {
     "gen:types": "rimraf types && tsc",
     "build:esm": "rimraf dist && node ../../scripts/buildBase.js && yarn gen:types"
+  },
+  "dependencies": {
+    "@braintree/sanitize-url": "6.0.2",
+    "es6-promise-pool": "2.5.0"
   }
 }

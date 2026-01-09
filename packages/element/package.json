@@ -58,6 +58,8 @@
   },
   "dependencies": {
     "@excalidraw/common": "0.18.0",
-    "@excalidraw/math": "0.18.0"
+    "@excalidraw/math": "0.18.0",
+    "fractional-indexing": "3.2.0",
+    "perfect-freehand": "1.2.0"
   }
 }
