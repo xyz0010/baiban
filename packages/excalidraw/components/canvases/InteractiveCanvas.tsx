@@ -242,6 +242,7 @@ const getRelevantAppStateProps = (
   theme: appState.theme,
   selectionElement: appState.selectionElement,
   selectedGroupIds: appState.selectedGroupIds,
+  collapsedGroupIds: appState.collapsedGroupIds,
   selectedLinearElement: appState.selectedLinearElement,
   multiElement: appState.multiElement,
   newElement: appState.newElement,

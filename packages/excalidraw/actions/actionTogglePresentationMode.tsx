@@ -1,8 +1,12 @@
 import { CaptureUpdateAction } from "@excalidraw/element";
+
+import type { ExcalidrawFrameElement } from "@excalidraw/element/types";
+
 import { presentationIcon } from "../components/icons";
+
 import { register } from "./register";
-import { AppState } from "../types";
-import { ExcalidrawFrameElement } from "@excalidraw/element/types";
+
+import type { AppState } from "../types";
 
 export const actionTogglePresentationMode = register({
   name: "presentationMode",
@@ -33,7 +37,7 @@ export const actionTogglePresentationMode = register({
     }
 
     const frames = elements.filter(
-      (el) => el.type === "frame" && !el.isDeleted
+      (el) => el.type === "frame" && !el.isDeleted,
     ) as ExcalidrawFrameElement[];
 
     const sortedFrames = frames.sort((a, b) => {

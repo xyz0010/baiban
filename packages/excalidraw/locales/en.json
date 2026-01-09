@@ -204,6 +204,7 @@
     "clearReset": "Reset the canvas",
     "exportJSON": "Export to file",
     "exportImage": "Export image...",
+    "exportToPdf": "Export to PDF",
     "export": "Save to...",
     "copyToClipboard": "Copy to clipboard",
     "copyLink": "Copy link",

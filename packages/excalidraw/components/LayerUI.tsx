@@ -39,7 +39,6 @@ import { MobileMenu } from "./MobileMenu";
 import { PasteChartDialog } from "./PasteChartDialog";
 import { Section } from "./Section";
 import Stack from "./Stack";
-import { UserList } from "./UserList";
 import { PenModeButton } from "./PenModeButton";
 import Footer from "./footer/Footer";
 import { isSidebarDockedAtom } from "./Sidebar/Sidebar";
@@ -115,6 +114,8 @@ const DefaultMainMenu: React.FC<{
       {UIOptions.canvasActions.saveAsImage && (
         <MainMenu.DefaultItems.SaveAsImage />
       )}
+      <MainMenu.DefaultItems.ExportToPdf />
+      <MainMenu.DefaultItems.ExportToOfflineHTML />
       <MainMenu.DefaultItems.SearchMenu />
       <MainMenu.DefaultItems.Help />
       <MainMenu.DefaultItems.ClearCanvas />
@@ -410,12 +411,6 @@ const LayerUI = ({
               },
             )}
           >
-            {appState.collaborators.size > 0 && (
-              <UserList
-                collaborators={appState.collaborators}
-                userToFollow={appState.userToFollow?.socketId || null}
-              />
-            )}
             {renderTopRightUI?.(
               editorInterface.formFactor === "phone",
               appState,

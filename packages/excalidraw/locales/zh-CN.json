@@ -203,6 +203,7 @@
     "clearReset": "重置画布",
     "exportJSON": "导出为文件",
     "exportImage": "导出图片...",
+    "exportToPdf": "导出为 PDF",
     "exportVideo": "导出视频",
     "export": "保存到...",
     "copyToClipboard": "复制到剪贴板",

@@ -29,10 +29,7 @@ import type {
   NonDeletedSceneElementsMap,
 } from "@excalidraw/element/types";
 
-import {
-  actionTogglePresentationMode,
-  actionToggleZenMode,
-} from "../actions";
+import { actionTogglePresentationMode, actionToggleZenMode } from "../actions";
 
 import { alignActionsPredicate } from "../actions/actionAlign";
 import { trackEvent } from "../analytics";
@@ -138,6 +135,39 @@ export const canChangeBackgroundColor = (
   );
 };
 
+const shouldShowLineEditorAction = (
+  appState: UIAppState,
+  targetElements: ExcalidrawElement[],
+) => {
+  return (
+    !appState.selectedLinearElement?.isEditing &&
+    targetElements.length === 1 &&
+    isLinearElement(targetElements[0]) &&
+    !isElbowArrow(targetElements[0])
+  );
+};
+
+const shouldShowCropEditorAction = (
+  appState: UIAppState,
+  targetElements: ExcalidrawElement[],
+) => {
+  return (
+    !appState.croppingElementId &&
+    targetElements.length === 1 &&
+    isImageElement(targetElements[0])
+  );
+};
+
+const checkIsSingleElementBoundContainer = (
+  targetElements: ExcalidrawElement[],
+) => {
+  return (
+    targetElements.length === 2 &&
+    (hasBoundTextElement(targetElements[0]) ||
+      hasBoundTextElement(targetElements[1]))
+  );
+};
+
 export const SelectedShapeActions = ({
   appState,
   elementsMap,
@@ -151,14 +181,8 @@ export const SelectedShapeActions = ({
 }) => {
   const targetElements = getTargetElements(elementsMap, appState);
 
-  let isSingleElementBoundContainer = false;
-  if (
-    targetElements.length === 2 &&
-    (hasBoundTextElement(targetElements[0]) ||
-      hasBoundTextElement(targetElements[1]))
-  ) {
-    isSingleElementBoundContainer = true;
-  }
+  const isSingleElementBoundContainer =
+    checkIsSingleElementBoundContainer(targetElements);
   const isEditingTextOrNewElement = Boolean(
     appState.editingTextElement || appState.newElement,
   );
@@ -176,22 +200,22 @@ export const SelectedShapeActions = ({
   const showLinkIcon =
     targetElements.length === 1 || isSingleElementBoundContainer;
 
-  const showLineEditorAction =
-    !appState.selectedLinearElement?.isEditing &&
-    targetElements.length === 1 &&
-    isLinearElement(targetElements[0]) &&
-    !isElbowArrow(targetElements[0]);
+  const showLineEditorAction = shouldShowLineEditorAction(
+    appState,
+    targetElements,
+  );
 
-  const showCropEditorAction =
-    !appState.croppingElementId &&
-    targetElements.length === 1 &&
-    isImageElement(targetElements[0]);
+  const showCropEditorAction = shouldShowCropEditorAction(
+    appState,
+    targetElements,
+  );
 
-  const showAlignActions =
-    !isSingleElementBoundContainer && alignActionsPredicate(appState, app);
+  const isTableSelected = targetElements.some(
+    (el) => (el.type as string) === "table",
+  );
 
   return (
-    <div className="selected-shape-actions">
+    <div className={PROPERTIES_CLASSES}>
       <div>
         {canChangeStrokeColor(appState, targetElements) &&
           renderAction("changeStrokeColor")}
@@ -257,7 +281,7 @@ export const SelectedShapeActions = ({
         </div>
       </fieldset>
 
-      {showAlignActions && !isSingleElementBoundContainer && (
+      {isTableSelected && (
         <fieldset>
           <legend>{t("labels.align")}</legend>
           <div className="buttonList">
@@ -310,6 +334,7 @@ export const SelectedShapeActions = ({
             {renderAction("group")}
             {renderAction("ungroup")}
             {showLinkIcon && renderAction("hyperlink")}
+            {renderAction("sendToFlomo")}
             {showCropEditorAction && renderAction("cropEditor")}
             {showLineEditorAction && renderAction("toggleLinearEditor")}
           </div>
@@ -631,20 +656,14 @@ const CombinedExtraActions = ({
   const isEditingTextOrNewElement = Boolean(
     appState.editingTextElement || appState.newElement,
   );
-  const showCropEditorAction =
-    !appState.croppingElementId &&
-    targetElements.length === 1 &&
-    isImageElement(targetElements[0]);
+  const showCropEditorAction = shouldShowCropEditorAction(
+    appState,
+    targetElements,
+  );
   const showLinkIcon = targetElements.length === 1;
   const showAlignActions = alignActionsPredicate(appState, app);
-  let isSingleElementBoundContainer = false;
-  if (
-    targetElements.length === 2 &&
-    (hasBoundTextElement(targetElements[0]) ||
-      hasBoundTextElement(targetElements[1]))
-  ) {
-    isSingleElementBoundContainer = true;
-  }
+  const isSingleElementBoundContainer =
+    checkIsSingleElementBoundContainer(targetElements);
 
   const isRTL = document.documentElement.getAttribute("dir") === "rtl";
   const isOpen = appState.openPopup === "compactOtherProperties";
@@ -808,12 +827,6 @@ export const CompactShapeActions = ({
     appState.editingTextElement || appState.newElement,
   );
 
-  const showLineEditorAction =
-    !appState.selectedLinearElement?.isEditing &&
-    targetElements.length === 1 &&
-    isLinearElement(targetElements[0]) &&
-    !isElbowArrow(targetElements[0]);
-
   return (
     <div className="compact-shape-actions">
       {/* Stroke Color */}
@@ -847,11 +860,11 @@ export const CompactShapeActions = ({
         app={app}
       />
       {/* Linear Editor */}
-      {showLineEditorAction && (
-        <div className="compact-action-item">
-          {renderAction("toggleLinearEditor")}
-        </div>
-      )}
+      <LinearEditorAction
+        appState={appState}
+        renderAction={renderAction}
+        targetElements={targetElements}
+      />
 
       {/* Text Properties */}
       {(appState.activeTool.type === "text" ||
@@ -1262,21 +1275,21 @@ export const ShapesSwitcher = ({
           >
             {t("labels.presentationMode")}
           </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() =>
+              app.setOpenDialog({ name: "ttd", tab: "mermaid" })
+            }
+            icon={mermaidLogoIcon}
+            data-testid="toolbar-mermaid"
+          >
+            @{t("toolBar.mermaidToExcalidraw")}
+          </DropdownMenu.Item>
           {app.props.aiEnabled !== false && (
             <>
               <div style={{ margin: "6px 0", fontSize: 14, fontWeight: 600 }}>
                 Generate
               </div>
               <TTDDialogTriggerTunnel.Out />
-              <DropdownMenu.Item
-                onSelect={() =>
-                  app.setOpenDialog({ name: "ttd", tab: "mermaid" })
-                }
-                icon={mermaidLogoIcon}
-                data-testid="toolbar-embeddable"
-              >
-                {t("toolBar.mermaidToExcalidraw")}
-              </DropdownMenu.Item>
               {app.plugins.diagramToCode && (
                 <DropdownMenu.Item
                   onSelect={() => app.onMagicframeToolSelect()}

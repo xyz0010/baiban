@@ -1,7 +1,9 @@
 import { CaptureUpdateAction } from "@excalidraw/element";
-import { register } from "./register";
+
 import { CheckboxItem } from "../components/CheckboxItem";
 import { t } from "../i18n";
+
+import { register } from "./register";
 
 export const actionExportWithDarkMode = register<boolean>({
   name: "exportWithDarkMode",

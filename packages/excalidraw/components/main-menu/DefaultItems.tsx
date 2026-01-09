@@ -1,5 +1,3 @@
-import clsx from "clsx";
-
 import { THEME } from "@excalidraw/common";
 
 import type { Theme } from "@excalidraw/element/types";
@@ -11,6 +9,8 @@ import {
   actionShortcuts,
   actionToggleSearchMenu,
   actionToggleTheme,
+  actionExportToPdf,
+  actionExportToOfflineHTML,
 } from "../../actions";
 import { getShortcutFromShortcutName } from "../../actions/shortcuts";
 import { trackEvent } from "../../analytics";
@@ -42,7 +42,6 @@ import {
   searchIcon,
   SunIcon,
   TrashIcon,
-  usersIcon,
 } from "../icons";
 
 import "./DefaultItems.scss";
@@ -126,6 +125,27 @@ export const SaveAsImage = () => {
   );
 };
 SaveAsImage.displayName = "SaveAsImage";
+
+export const ExportToPdf = () => {
+  const { t } = useI18n();
+  const actionManager = useExcalidrawActionManager();
+
+  if (!actionManager.isActionEnabled(actionExportToPdf)) {
+    return null;
+  }
+
+  return (
+    <DropdownMenuItem
+      icon={ExportIcon}
+      onSelect={() => actionManager.executeAction(actionExportToPdf)}
+      data-testid="pdf-export-button"
+      aria-label={t("buttons.exportToPdf")}
+    >
+      {t("buttons.exportToPdf")}
+    </DropdownMenuItem>
+  );
+};
+ExportToPdf.displayName = "ExportToPdf";
 
 export const CommandPalette = (opts?: { className?: string }) => {
   const setAppState = useExcalidrawSetAppState();
@@ -339,6 +359,27 @@ export const Export = () => {
 };
 Export.displayName = "Export";
 
+export const ExportToOfflineHTML = () => {
+  const { t } = useI18n();
+  const actionManager = useExcalidrawActionManager();
+
+  if (!actionManager.isActionEnabled(actionExportToOfflineHTML)) {
+    return null;
+  }
+
+  return (
+    <DropdownMenuItem
+      icon={ExportIcon}
+      onSelect={() => actionManager.executeAction(actionExportToOfflineHTML)}
+      data-testid="offline-html-export-button"
+      aria-label="导出为离线预览HTML"
+    >
+      导出为离线预览HTML
+    </DropdownMenuItem>
+  );
+};
+ExportToOfflineHTML.displayName = "ExportToOfflineHTML";
+
 export const Socials = () => {
   const { t } = useI18n();
 
@@ -369,27 +410,3 @@ export const Socials = () => {
   );
 };
 Socials.displayName = "Socials";
-
-export const LiveCollaborationTrigger = ({
-  onSelect,
-  isCollaborating,
-}: {
-  onSelect: () => void;
-  isCollaborating: boolean;
-}) => {
-  const { t } = useI18n();
-  return (
-    <DropdownMenuItem
-      data-testid="collab-button"
-      icon={usersIcon}
-      className={clsx({
-        "active-collab": isCollaborating,
-      })}
-      onSelect={onSelect}
-    >
-      {t("labels.liveCollaboration")}
-    </DropdownMenuItem>
-  );
-};
-
-LiveCollaborationTrigger.displayName = "LiveCollaborationTrigger";

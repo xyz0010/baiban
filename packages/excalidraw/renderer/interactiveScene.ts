@@ -662,6 +662,57 @@ type ElementSelectionBorder = {
   cy: number;
   activeEmbeddable: boolean;
   padding?: number;
+  groupId?: string;
+  isCollapsed?: boolean;
+};
+
+export const drawEyeIcon = (
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  isOpen: boolean,
+  color: string,
+) => {
+  context.save();
+  context.setLineDash([]);
+  context.translate(x, y);
+  const scale = size / 24;
+  context.scale(scale, scale);
+  context.lineWidth = 1.5 / scale; // Keep constant line width relative to scene? No, constant on screen.
+  // context.scale scales the coordinate system.
+  // We want 1.5px on SCREEN.
+  // Current transform: zoom * scale.
+  // zoom * scale = zoom * (1/zoom) = 1.
+  // So lineWidth 1.5 results in 1.5px on screen.
+  context.lineWidth = 1.5;
+
+  context.strokeStyle = color || "black";
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  context.beginPath();
+  if (isOpen) {
+    // Open Eye
+    // Pupil
+    context.moveTo(14, 12);
+    context.arc(12, 12, 2, 0, Math.PI * 2);
+    // Outline
+    context.moveTo(21, 12);
+    context.bezierCurveTo(18.6, 16, 15.6, 18, 12, 18);
+    context.bezierCurveTo(8.4, 18, 5.4, 16, 3, 12);
+    context.bezierCurveTo(5.4, 8, 8.4, 6, 12, 6);
+    context.bezierCurveTo(15.6, 6, 18.6, 8, 21, 12);
+  } else {
+    // Closed Eye (Lid + Cross)
+    context.moveTo(3, 12);
+    context.bezierCurveTo(5.4, 8, 8.4, 6, 12, 6);
+    context.bezierCurveTo(15.6, 6, 18.6, 8, 21, 12);
+    context.moveTo(3, 3);
+    context.lineTo(21, 21);
+  }
+  context.stroke();
+  context.restore();
 };
 
 const renderSelectionBorder = (
@@ -716,6 +767,21 @@ const renderSelectionBorder = (
       angle,
     );
   }
+
+  if (elementProperties.groupId) {
+    const iconSize = 24 / appState.zoom.value;
+    const padding = 4 / appState.zoom.value;
+    // console.log("Drawing eye icon", elementProperties.groupId);
+    drawEyeIcon(
+      context,
+      x2 - iconSize,
+      y1 - iconSize - padding,
+      iconSize,
+      !elementProperties.isCollapsed,
+      selectionColors[0],
+    );
+  }
+
   context.restore();
 };
 
@@ -777,12 +843,19 @@ const renderElementsBoxHighlight = (
       cx: x1 + (x2 - x1) / 2,
       cy: y1 + (y2 - y1) / 2,
       activeEmbeddable: false,
+      groupId: undefined as string | undefined,
+      isCollapsed: undefined as boolean | undefined,
     };
   };
 
   const getSelectionForGroupId = (groupId: GroupId) => {
     const groupElements = getElementsInGroup(elements, groupId);
-    return getSelectionFromElements(groupElements);
+    const selection = getSelectionFromElements(groupElements);
+    return {
+      ...selection,
+      groupId: groupId as string | undefined,
+      isCollapsed: appState.collapsedGroupIds?.[groupId] as boolean | undefined,
+    };
   };
 
   Object.entries(selectGroupsFromGivenElements(elementsInGroups, appState))
@@ -792,9 +865,10 @@ const renderElementsBoxHighlight = (
     .concat(
       individualElements.map((element) => getSelectionFromElements([element])),
     )
-    .forEach((selection) =>
-      renderSelectionBorder(context, appState, selection),
-    );
+    .forEach((selection) => {
+      // console.log("Rendering selection for", selection.groupId);
+      renderSelectionBorder(context, appState, selection);
+    });
 };
 
 const renderLinearPointHandles = (
@@ -1384,11 +1458,13 @@ const _renderInteractiveScene = ({
           y2,
           selectionColors: groupElements.some((el) => el.locked)
             ? ["#ced4da"]
-            : [oc.black],
+            : [selectionColor],
           dashed: true,
           cx: x1 + (x2 - x1) / 2,
           cy: y1 + (y2 - y1) / 2,
           activeEmbeddable: false,
+          groupId,
+          isCollapsed: appState.collapsedGroupIds?.[groupId],
         });
       };
 

@@ -92,6 +92,7 @@ export const getDefaultAppState = (): Omit<
     selectedElementIds: {},
     hoveredElementIds: {},
     selectedGroupIds: {},
+    collapsedGroupIds: {},
     selectedElementsAreBeingDragged: false,
     selectionElement: null,
     shouldCacheIgnoreZoom: false,
@@ -222,6 +223,7 @@ const APP_STATE_STORAGE_CONF = (<
   selectedElementIds: { browser: true, export: false, server: false },
   hoveredElementIds: { browser: false, export: false, server: false },
   selectedGroupIds: { browser: true, export: false, server: false },
+  collapsedGroupIds: { browser: true, export: false, server: false },
   selectedElementsAreBeingDragged: {
     browser: false,
     export: false,

@@ -1,27 +1,14 @@
-import {
-  KEYS,
-  DEFAULT_EXPORT_PADDING,
-  EXPORT_SCALES,
-  THEME,
-} from "@excalidraw/common";
+import { DEFAULT_EXPORT_PADDING, EXPORT_SCALES, KEYS } from "@excalidraw/common";
 
 import { getNonDeletedElements } from "@excalidraw/element";
 
 import { CaptureUpdateAction } from "@excalidraw/element";
 
-import type { Theme } from "@excalidraw/element/types";
-
-import { useEditorInterface } from "../components/App";
 import { CheckboxItem } from "../components/CheckboxItem";
-import { DarkModeToggle } from "../components/DarkModeToggle";
 import { ProjectName } from "../components/ProjectName";
 import { ToolButton } from "../components/ToolButton";
-import { Tooltip } from "../components/Tooltip";
-import { ExportIcon, questionCircle, saveAs } from "../components/icons";
 import { loadFromJSON, saveAsJSON } from "../data";
-import { isImageFileHandle } from "../data/blob";
-import { nativeFileSystemSupported, fileSave } from "../data/filesystem";
-import { resaveAsImageWithScene } from "../data/resave";
+import { fileSave } from "../data/filesystem";
 
 import { t } from "../i18n";
 import { getSelectedElements, isSomeElementSelected } from "../scene";

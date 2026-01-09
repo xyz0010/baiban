@@ -100,6 +100,7 @@ export type ActionName =
   | "changeVerticalAlign"
   | "toggleFullScreen"
   | "toggleShortcuts"
+  | "sendToFlomo"
   | "group"
   | "ungroup"
   | "goToCollaborator"
@@ -146,7 +147,9 @@ export type ActionName =
   | "toggleLassoTool"
   | "toggleShapeSwitch"
   | "togglePolygon"
-  | "presentationMode";
+  | "presentationMode"
+  | "exportToPdf"
+  | "exportToOfflineHTML";
 
 export type PanelComponentProps = {
   elements: readonly ExcalidrawElement[];

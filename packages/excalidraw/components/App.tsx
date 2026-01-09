@@ -28,7 +28,6 @@ import {
   KEYS,
   APP_NAME,
   CURSOR_TYPE,
-  DEFAULT_MAX_IMAGE_WIDTH_OR_HEIGHT,
   DEFAULT_VERTICAL_ALIGN,
   DRAGGING_THRESHOLD,
   ELEMENT_SHIFT_TRANSLATE_AMOUNT,
@@ -214,6 +213,7 @@ import {
   getSelectedGroupIdForElement,
   getSelectedGroupIds,
   isElementInGroup,
+  isElementInCollapsedGroup,
   isSelectedViaGroup,
   selectGroupsForSelectedElements,
   syncInvalidIndices,
@@ -316,6 +316,8 @@ import {
   actionToggleLinearEditor,
   actionToggleObjectsSnapMode,
   actionToggleCropEditor,
+  actionSendToFlomo,
+  actionExportToOfflineHTML,
 } from "../actions";
 import { actionWrapTextInContainer } from "../actions/actionBoundText";
 import { actionToggleHandTool, zoomToFit } from "../actions/actionCanvas";
@@ -374,7 +376,6 @@ import {
   loadSceneOrLibraryFromBlob,
   normalizeFile,
   parseLibraryJSON,
-  resizeImageFile,
   SVGStringToFile,
 } from "../data/blob";
 
@@ -1366,9 +1367,13 @@ class App extends React.Component<AppProps, AppState> {
       .getNonDeletedElements()
       .filter(
         (el): el is Ordered<NonDeleted<ExcalidrawIframeLikeElement>> =>
-          (isEmbeddableElement(el) &&
+          ((isEmbeddableElement(el) &&
             this.embedsValidationStatus.get(el.id) === true) ||
-          isIframeElement(el),
+            isIframeElement(el)) &&
+          (el.groupIds.length === 0 ||
+            !el.groupIds.some(
+              (groupId) => this.state.collapsedGroupIds?.[groupId],
+            )),
       );
 
     return (
@@ -1611,68 +1616,69 @@ class App extends React.Component<AppProps, AppState> {
                     padding: `${el.strokeWidth}px`,
                   }}
                 >
-                  {el.link && el.link.startsWith("video-file:") ? (
-                    (() => {
-                      const fileId = el.link.replace("video-file:", "");
-                      const file = this.files[fileId];
-                      if (!file) {
+                  {el.link && el.link.startsWith("video-file:")
+                    ? (() => {
+                        const fileId = el.link.replace("video-file:", "");
+                        const file = this.files[fileId];
+                        if (!file) {
+                          return (
+                            <div
+                              style={{
+                                padding: "10px",
+                                color: "red",
+                                background: "white",
+                              }}
+                            >
+                              Video file not found: {fileId}
+                            </div>
+                          );
+                        }
                         return (
-                          <div
+                          <video
+                            className="excalidraw__embeddable"
+                            src={file.dataURL}
+                            controls
                             style={{
-                              padding: "10px",
-                              color: "red",
-                              background: "white",
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                              backgroundColor: "#000",
+                              display: "block",
                             }}
-                          >
-                            Video file not found: {fileId}
-                          </div>
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          />
                         );
-                      }
-                      return (
-                        <video
+                      })()
+                    : (isEmbeddableElement(el)
+                        ? this.props.renderEmbeddable?.(el, this.state)
+                        : null) ?? (
+                        <iframe
+                          ref={(ref) => this.cacheEmbeddableRef(el, ref)}
                           className="excalidraw__embeddable"
-                          src={file.dataURL}
-                          controls
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "contain",
-                            backgroundColor: "#000",
-                            display: "block",
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
+                          srcDoc={
+                            src?.type === "document"
+                              ? src.srcdoc(this.state.theme)
+                              : undefined
+                          }
+                          src={
+                            src?.type !== "document"
+                              ? src?.link ?? ""
+                              : undefined
+                          }
+                          // https://stackoverflow.com/q/18470015
+                          scrolling="no"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          title="Excalidraw Embedded Content"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen={true}
+                          sandbox={`${
+                            src?.sandbox?.allowSameOrigin
+                              ? "allow-same-origin"
+                              : ""
+                          } allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
                         />
-                      );
-                    })()
-                  ) : (
-                    (isEmbeddableElement(el)
-                      ? this.props.renderEmbeddable?.(el, this.state)
-                      : null) ?? (
-                      <iframe
-                        ref={(ref) => this.cacheEmbeddableRef(el, ref)}
-                        className="excalidraw__embeddable"
-                        srcDoc={
-                          src?.type === "document"
-                            ? src.srcdoc(this.state.theme)
-                            : undefined
-                        }
-                        src={
-                          src?.type !== "document" ? src?.link ?? "" : undefined
-                        }
-                        // https://stackoverflow.com/q/18470015
-                        scrolling="no"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        title="Excalidraw Embedded Content"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen={true}
-                        sandbox={`${
-                          src?.sandbox?.allowSameOrigin
-                            ? "allow-same-origin"
-                            : ""
-                        } allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
-                      />
-                    ))}
+                      )}
                 </div>
               </div>
             </div>
@@ -3024,7 +3030,11 @@ class App extends React.Component<AppProps, AppState> {
         this.setState({
           presentationModeEnabled: false,
           viewModeEnabled: false,
-          activeTool: { ...this.state.activeTool, type: "selection", customType: null },
+          activeTool: {
+            ...this.state.activeTool,
+            type: "selection",
+            customType: null,
+          },
         });
       }
     }
@@ -7088,6 +7098,41 @@ class App extends React.Component<AppProps, AppState> {
     }
   }
 
+  private hitTestGroupEyeIcon = (x: number, y: number): string | null => {
+    const { selectedGroupIds, zoom } = this.state;
+    const elements = this.scene.getNonDeletedElements();
+
+    const iconSize = 24 / zoom.value;
+    const padding = 4 / zoom.value;
+
+    const groupsToCheck = Object.keys(selectedGroupIds).filter(
+      (id) => selectedGroupIds[id],
+    );
+
+    for (const groupId of groupsToCheck) {
+      const groupElements = getElementsInGroup(elements, groupId);
+      if (groupElements.length === 0) {
+        continue;
+      }
+
+      const [x1, y1, x2, y2] = getCommonBounds(groupElements);
+
+      const iconX = x2 - iconSize;
+      const iconY = y1 - iconSize - padding;
+
+      if (
+        x >= iconX &&
+        x <= iconX + iconSize &&
+        y >= iconY &&
+        y <= iconY + iconSize
+      ) {
+        return groupId;
+      }
+    }
+
+    return null;
+  };
+
   private handleCanvasPointerDown = (
     event: React.PointerEvent<HTMLElement>,
   ) => {
@@ -7107,6 +7152,17 @@ class App extends React.Component<AppProps, AppState> {
 
     this.maybeCleanupAfterMissingPointerUp(event.nativeEvent);
     this.maybeUnfollowRemoteUser();
+
+    const clickedGroup = this.hitTestGroupEyeIcon(scenePointerX, scenePointerY);
+    if (clickedGroup) {
+      this.setState((state) => ({
+        collapsedGroupIds: {
+          ...state.collapsedGroupIds,
+          [clickedGroup]: !state.collapsedGroupIds[clickedGroup],
+        },
+      }));
+      return;
+    }
 
     if (this.state.searchMatches) {
       this.setState((state) => {
@@ -7518,7 +7574,11 @@ class App extends React.Component<AppProps, AppState> {
       onPointerUp(_event || event.nativeEvent),
     );
 
-    if (!this.state.viewModeEnabled || this.state.presentationModeEnabled || this.state.activeTool.type === "laser") {
+    if (
+      !this.state.viewModeEnabled ||
+      this.state.presentationModeEnabled ||
+      this.state.activeTool.type === "laser"
+    ) {
       window.addEventListener(EVENT.POINTER_MOVE, onPointerMove);
       window.addEventListener(EVENT.POINTER_UP, onPointerUp);
       window.addEventListener(EVENT.KEYDOWN, onKeyDown);
@@ -8953,7 +9013,9 @@ class App extends React.Component<AppProps, AppState> {
     if (type === "frame") {
       const frames = this.scene
         .getNonDeletedElements()
-        .filter((el) => el.type === "frame" && el.name) as ExcalidrawFrameElement[];
+        .filter(
+          (el) => el.type === "frame" && el.name,
+        ) as ExcalidrawFrameElement[];
       const maxNumber = frames.reduce((max, frame) => {
         const num = parseInt(frame.name!, 10);
         return !isNaN(num) && num > max ? num : max;
@@ -11459,7 +11521,7 @@ class App extends React.Component<AppProps, AppState> {
       sceneY,
       gridPadding,
     );
-    
+
     // Ensure validation status is set for positioned elements
     positioned.forEach((el) => {
       if (
@@ -11540,8 +11602,7 @@ class App extends React.Component<AppProps, AppState> {
       .map((data) => data.file)
       .filter(
         (file) =>
-          file.type === "video/mp4" ||
-          file.name.toLowerCase().endsWith(".mp4"),
+          file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4"),
       );
 
     if (videoFiles.length > 0) {
@@ -12127,7 +12188,12 @@ class App extends React.Component<AppProps, AppState> {
   ): ContextMenuItems => {
     const options: ContextMenuItems = [];
 
-    options.push(actionCopyAsPng, actionExportPng, actionExportVideo, actionCopyAsSvg);
+    options.push(
+      actionCopyAsPng,
+      actionExportPng,
+      actionExportVideo,
+      actionCopyAsSvg,
+    );
 
     // canvas contextMenu
     // -------------------------------------------------------------------------

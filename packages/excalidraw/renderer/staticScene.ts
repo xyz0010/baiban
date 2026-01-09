@@ -9,8 +9,11 @@ import {
 } from "@excalidraw/element";
 import {
   elementOverlapsWithFrame,
+  getCommonBounds,
+  getElementsInGroup,
   getTargetFrame,
   shouldApplyFrameClip,
+  isElementInCollapsedGroup,
 } from "@excalidraw/element";
 
 import { renderElement } from "@excalidraw/element";
@@ -30,6 +33,7 @@ import {
 } from "../components/hyperlink/helpers";
 
 import { bootstrapCanvas, getNormalizedCanvasDimensions } from "./helpers";
+import { drawEyeIcon } from "./interactiveScene";
 
 import type {
   StaticCanvasRenderConfig,
@@ -258,30 +262,74 @@ const _renderStaticScene = ({
   }
 
   const groupsToBeAddedToFrame = new Set<string>();
+  const collapsedGroupsToRender = new Set<string>();
 
   visibleElements.forEach((element) => {
-    if (
-      element.groupIds.length > 0 &&
-      appState.frameToHighlight &&
-      appState.selectedElementIds[element.id] &&
-      (elementOverlapsWithFrame(
-        element,
-        appState.frameToHighlight,
-        elementsMap,
-      ) ||
-        element.groupIds.find((groupId) => groupsToBeAddedToFrame.has(groupId)))
-    ) {
-      element.groupIds.forEach((groupId) =>
-        groupsToBeAddedToFrame.add(groupId),
-      );
+    if (element.groupIds.length > 0) {
+      if (appState.frameToHighlight &&
+        appState.selectedElementIds[element.id] &&
+        (elementOverlapsWithFrame(
+          element,
+          appState.frameToHighlight,
+          elementsMap,
+        ) ||
+          element.groupIds.find((groupId) => groupsToBeAddedToFrame.has(groupId)))
+      ) {
+        element.groupIds.forEach((groupId) =>
+          groupsToBeAddedToFrame.add(groupId),
+        );
+      }
+      
+      element.groupIds.forEach((groupId) => {
+        if (appState.collapsedGroupIds?.[groupId]) {
+          collapsedGroupsToRender.add(groupId);
+        }
+      });
     }
   });
+
+  // Render collapsed groups placeholders
+  if (collapsedGroupsToRender.size > 0) {
+    context.save();
+    context.translate(appState.scrollX, appState.scrollY);
+    context.fillStyle = "rgba(200, 200, 200, 0.3)";
+    collapsedGroupsToRender.forEach((groupId) => {
+      const groupElements = getElementsInGroup(elementsMap, groupId);
+      const [x1, y1, x2, y2] = getCommonBounds(groupElements);
+      const width = x2 - x1;
+      const height = y2 - y1;
+      
+      context.fillRect(x1, y1, width, height);
+      
+      const cx = x1 + width / 2;
+      const cy = y1 + height / 2;
+      const iconSize = 24 / appState.zoom.value;
+      
+      drawEyeIcon(
+        context,
+        cx - iconSize / 2,
+        cy - iconSize / 2,
+        iconSize,
+        false, // closed eye
+        "rgba(0, 0, 0, 0.5)"
+      );
+    });
+    context.restore();
+  }
 
   const inFrameGroupsMap = new Map<string, boolean>();
 
   // Paint visible elements
   visibleElements
     .filter((el) => !isIframeLikeElement(el))
+    .filter((element) => {
+      if (element.groupIds.length === 0) {
+        return true;
+      }
+      return !element.groupIds.some(
+        (groupId) => appState.collapsedGroupIds?.[groupId],
+      );
+    })
     .forEach((element) => {
       try {
         const frameId = element.frameId || appState.frameToHighlight?.id;
@@ -369,6 +417,7 @@ const _renderStaticScene = ({
   // render embeddables on top
   visibleElements
     .filter((el) => isIframeLikeElement(el))
+    .filter((element) => !isElementInCollapsedGroup(element, appState))
     .forEach((element) => {
       try {
         const render = () => {

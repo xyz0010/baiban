@@ -56,9 +56,7 @@ DefaultTabTriggers.displayName = "DefaultTabTriggers";
 const DefaultSidebarContent = ({ children }: { children: React.ReactNode }) => {
   const { DefaultSidebarContentTunnel } = useTunnels();
   return (
-    <DefaultSidebarContentTunnel.In>
-      {children}
-    </DefaultSidebarContentTunnel.In>
+    <DefaultSidebarContentTunnel.In>{children}</DefaultSidebarContentTunnel.In>
   );
 };
 DefaultSidebarContent.displayName = "DefaultSidebarContent";
@@ -82,7 +80,8 @@ export const DefaultSidebar = Object.assign(
       const appState = useUIAppState();
       const setAppState = useExcalidrawSetAppState();
 
-      const { DefaultSidebarTabTriggersTunnel, DefaultSidebarContentTunnel } = useTunnels();
+      const { DefaultSidebarTabTriggersTunnel, DefaultSidebarContentTunnel } =
+        useTunnels();
 
       const isForceDocked = appState.openSidebar?.tab === CANVAS_SEARCH_TAB;
 

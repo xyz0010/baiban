@@ -186,6 +186,7 @@ type _CommonCanvasAppState = {
   openDialog: AppState["openDialog"];
   editingGroupId: AppState["editingGroupId"]; // TODO: move to interactive canvas if possible
   selectedElementIds: AppState["selectedElementIds"]; // TODO: move to interactive canvas if possible
+  collapsedGroupIds: AppState["collapsedGroupIds"]; // TODO: move to interactive canvas if possible
   frameToHighlight: AppState["frameToHighlight"]; // TODO: move to interactive canvas if possible
   offsetLeft: AppState["offsetLeft"];
   offsetTop: AppState["offsetTop"];
@@ -207,6 +208,7 @@ export type StaticCanvasAppState = Readonly<
     suggestedBinding: AppState["suggestedBinding"];
     // Cropping
     croppingElementId: AppState["croppingElementId"];
+    collapsedGroupIds: AppState["collapsedGroupIds"];
   }
 >;
 
@@ -216,6 +218,7 @@ export type InteractiveCanvasAppState = Readonly<
     activeEmbeddable: AppState["activeEmbeddable"];
     selectionElement: AppState["selectionElement"];
     selectedGroupIds: AppState["selectedGroupIds"];
+    collapsedGroupIds: AppState["collapsedGroupIds"];
     selectedLinearElement: AppState["selectedLinearElement"];
     multiElement: AppState["multiElement"];
     newElement: AppState["newElement"];
@@ -403,6 +406,8 @@ export interface AppState {
 
   /** top-most selected groups (i.e. does not include nested groups) */
   selectedGroupIds: { [groupId: string]: boolean };
+  /** collapsed groups */
+  collapsedGroupIds: { [groupId: string]: boolean };
   /** group being edited when you drill down to its constituent element
     (e.g. when you double-click on a group's element) */
   editingGroupId: GroupId | null;
