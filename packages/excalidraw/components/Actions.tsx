@@ -333,6 +333,7 @@ export const SelectedShapeActions = ({
               renderAction("deleteSelectedElements")}
             {renderAction("group")}
             {renderAction("ungroup")}
+            {renderAction("breakApartText")}
             {showLinkIcon && renderAction("hyperlink")}
             {renderAction("sendToFlomo")}
             {showCropEditorAction && renderAction("cropEditor")}

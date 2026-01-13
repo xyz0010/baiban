@@ -217,7 +217,7 @@ export const actionCopyAsPng = register({
         exportedElements,
         {
           ...appState,
-          exportScale: Math.max(window.devicePixelRatio, 2),
+          exportScale: 1,
         },
         app.files,
         {
@@ -257,7 +257,10 @@ export const actionCopyAsPng = register({
   predicate: (elements) => {
     return probablySupportsClipboardBlob && elements.length > 0;
   },
-  keyTest: (event) => event.code === CODES.C && event.altKey && event.shiftKey,
+  keyTest: (event) =>
+    event.code === CODES.C &&
+    event.shiftKey &&
+    (event.altKey || event[KEYS.CTRL_OR_CMD]),
   keywords: ["png", "clipboard", "copy"],
 });
 

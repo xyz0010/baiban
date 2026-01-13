@@ -351,7 +351,32 @@ export const textWysiwyg = ({
       }
     };
 
-    editable.oninput = () => {
+    editable.oninput = (event: Event) => {
+      if (
+        event instanceof InputEvent &&
+        event.inputType === "insertText" &&
+        event.data === "@"
+      ) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const day = now.getDate();
+        const hour = now.getHours();
+        const minute = now.getMinutes().toString().padStart(2, "0");
+        const dateString = `${year}/${month}/${day}/${hour}:${minute}`;
+
+        const selectionStart = editable.selectionStart;
+        const value = editable.value;
+        const nextValue =
+          value.slice(0, selectionStart) +
+          dateString +
+          value.slice(selectionStart);
+
+        editable.value = nextValue;
+        editable.selectionStart = selectionStart + dateString.length;
+        editable.selectionEnd = selectionStart + dateString.length;
+      }
+
       const normalized = normalizeText(editable.value);
       if (editable.value !== normalized) {
         const selectionStart = editable.selectionStart;

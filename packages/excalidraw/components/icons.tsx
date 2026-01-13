@@ -84,6 +84,14 @@ export const PlusPromoIcon = createIcon(
   tablerIconProps,
 );
 
+export const BreakApartIcon = createIcon(
+  <path
+    d="M246.912 470.4h143.936l-72.96-191.936-71.04 191.936z m-30.72 83.2L167.04 686.4a41.6 41.6 0 0 1-78.08-28.8l159.744-432a73.6 73.6 0 0 1 137.856-0.64l164.352 432.256a41.6 41.6 0 0 1-77.824 29.568L422.528 553.6H216.064zM105.6 768h812.8a41.6 41.6 0 1 1 0 83.2H105.6a41.6 41.6 0 1 1 0-83.2z m512-192h300.8a41.6 41.6 0 1 1 0 83.2H617.6a41.6 41.6 0 1 1 0-83.2z m0-192h300.8a41.6 41.6 0 1 1 0 83.2H617.6a41.6 41.6 0 1 1 0-83.2z"
+    fill="currentColor"
+  />,
+  { width: 1024, height: 1024 },
+);
+
 // tabler-icons: book
 export const LibraryIcon = createIcon(
   <g strokeWidth="1.25">

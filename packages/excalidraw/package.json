@@ -70,7 +70,7 @@
   "bugs": "https://github.com/excalidraw/excalidraw/issues",
   "homepage": "https://github.com/excalidraw/excalidraw/tree/master/packages/excalidraw",
   "scripts": {
-    "gen:types": "rimraf types && tsc",
+    "gen:types": "rimraf dist/types && tsc",
     "build:esm": "rimraf dist && node ../../scripts/buildPackage.js && yarn gen:types"
   },
   "peerDependencies": {

@@ -149,7 +149,8 @@ export type ActionName =
   | "togglePolygon"
   | "presentationMode"
   | "exportToPdf"
-  | "exportToOfflineHTML";
+  | "exportToOfflineHTML"
+  | "breakApartText";
 
 export type PanelComponentProps = {
   elements: readonly ExcalidrawElement[];

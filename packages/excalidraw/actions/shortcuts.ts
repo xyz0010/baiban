@@ -90,7 +90,7 @@ const shortcutMap: Record<ShortcutName, string[]> = {
       ? getShortcutKey("CtrlOrCmd+Alt+]")
       : getShortcutKey("CtrlOrCmd+Shift+]"),
   ],
-  copyAsPng: [getShortcutKey("Shift+Alt+C")],
+  copyAsPng: [getShortcutKey("Shift+Alt+C"), getShortcutKey("CtrlOrCmd+Shift+C")],
   group: [getShortcutKey("CtrlOrCmd+G")],
   ungroup: [getShortcutKey("CtrlOrCmd+Shift+G")],
   gridMode: [getShortcutKey("CtrlOrCmd+'")],

@@ -318,6 +318,7 @@ import {
   actionToggleCropEditor,
   actionSendToFlomo,
   actionExportToOfflineHTML,
+  actionBreakApartText,
 } from "../actions";
 import { actionWrapTextInContainer } from "../actions/actionBoundText";
 import { actionToggleHandTool, zoomToFit } from "../actions/actionCanvas";
@@ -1970,6 +1971,7 @@ class App extends React.Component<AppProps, AppState> {
         }}
         ref={this.excalidrawContainerRef}
         onDrop={this.handleAppOnDrop}
+        onDragOver={this.handleAppOnDragOver}
         tabIndex={0}
         onKeyDown={
           this.props.handleKeyboardGlobally ? undefined : this.onKeyDown
@@ -3887,9 +3889,13 @@ class App extends React.Component<AppProps, AppState> {
     }
   }
 
-  private addTextFromPaste(text: string, isPlainPaste = false) {
+  private addTextFromPaste(
+    text: string,
+    isPlainPaste = false,
+    viewportCoords?: { clientX: number; clientY: number },
+  ) {
     const { x, y } = viewportCoordsToSceneCoords(
-      {
+      viewportCoords || {
         clientX: this.lastViewportPosition.x,
         clientY: this.lastViewportPosition.y,
       },
@@ -3925,7 +3931,7 @@ class App extends React.Component<AppProps, AppState> {
     const LINE_GAP = 10;
     let currentY = y;
 
-    const lines = isPlainPaste ? [text] : text.split("\n");
+    const lines = isPlainPaste ? text.split("\n") : [text];
     const textElements = lines.reduce(
       (acc: ExcalidrawTextElement[], line, idx) => {
         const originalText = normalizeText(line).trim();
@@ -3946,7 +3952,7 @@ class App extends React.Component<AppProps, AppState> {
             ? measureText(text, fontString, lineHeight)
             : metrics;
 
-          const startX = x - metrics.width / 2;
+          const startX = x;
           const startY = currentY - metrics.height / 2;
 
           const element = newTextElement({
@@ -11555,6 +11561,10 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
+  private handleAppOnDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
   private handleAppOnDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
       event,
@@ -11688,6 +11698,11 @@ class App extends React.Component<AppProps, AppState> {
           this.store.scheduleCapture();
           this.setState({ selectedElementIds: { [embeddable.id]: true } });
         }
+      } else if (text) {
+        this.addTextFromPaste(text, false, {
+          clientX: event.clientX,
+          clientY: event.clientY,
+        });
       }
     }
   };
@@ -12271,6 +12286,7 @@ class App extends React.Component<AppProps, AppState> {
       actionBindText,
       actionWrapTextInContainer,
       actionUngroup,
+      actionBreakApartText,
       CONTEXT_MENU_SEPARATOR,
       actionAddToLibrary,
       ...zIndexActions,
