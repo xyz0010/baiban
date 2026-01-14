@@ -2,7 +2,7 @@
 // ExcalidrawImageElement & related helpers
 // -----------------------------------------------------------------------------
 
-import { MIME_TYPES, SVG_NS } from "@excalidraw/common";
+import { MIME_TYPES, ATTACHMENT_MIME_TYPES, IMAGE_MIME_TYPES } from "@excalidraw/common";
 
 import type {
   AppClassProperties,
@@ -12,11 +12,53 @@ import type {
 
 import { isInitializedImageElement } from "./typeChecks";
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 import type {
   ExcalidrawElement,
   FileId,
   InitializedExcalidrawImageElement,
 } from "./types";
+
+const getIconForMimeType = (mimeType: string, fileName?: string): string => {
+  const typeMap = ATTACHMENT_MIME_TYPES as Record<string, string>;
+  let ext =
+    Object.keys(typeMap).find((key) => typeMap[key] === mimeType);
+
+  if (!ext && fileName) {
+    const parts = fileName.split(".");
+    if (parts.length > 1) {
+      ext = parts.pop()?.toLowerCase();
+    }
+  }
+
+  ext = (ext || "FILE").substring(0, 4); // limit to 4 chars for icon
+
+  let displayName = fileName || "";
+  if (displayName.length > 10) {
+    displayName =
+      displayName.substring(0, 5) +
+      "..." +
+      displayName.substring(displayName.length - 4);
+  }
+
+  const safeName = displayName
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="100" height="120">
+      <path d="M15 5 h50 l30 30 v80 h-80 z" fill="#fff" stroke="#000" stroke-width="2"/>
+      <path d="M65 5 v30 h30" fill="none" stroke="#000" stroke-width="2"/>
+      <text x="50" y="60" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#000">${ext.toUpperCase()}</text>
+      <text x="50" y="105" font-family="sans-serif" font-size="10" text-anchor="middle" fill="#000">${safeName}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+};
 
 export const loadHTMLImageElement = (dataURL: DataURL) => {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -53,11 +95,22 @@ export const updateImageCache = async ({
         return promises.concat(
           (async () => {
             try {
-              if (fileData.mimeType === MIME_TYPES.binary) {
-                throw new Error("Only images can be added to ImageCache");
+              let imagePromise: Promise<HTMLImageElement>;
+
+              if (
+                Object.values(IMAGE_MIME_TYPES).includes(
+                  fileData.mimeType as any,
+                )
+              ) {
+                imagePromise = loadHTMLImageElement(fileData.dataURL);
+              } else {
+                const iconUrl = getIconForMimeType(
+                  fileData.mimeType,
+                  fileData.name,
+                );
+                imagePromise = loadHTMLImageElement(iconUrl as DataURL);
               }
 
-              const imagePromise = loadHTMLImageElement(fileData.dataURL);
               const data = {
                 image: imagePromise,
                 mimeType: fileData.mimeType,

@@ -7,9 +7,16 @@ import { FileListSidebar } from "./FileListSidebar";
 interface Props {
   onLoadFile: (id: string) => void;
   currentFileId: string | null;
+  onRename: (id: string, newName: string) => void;
+  currentFileName?: string;
 }
 
-export const AppSidebar = ({ onLoadFile, currentFileId }: Props) => {
+export const AppSidebar = ({
+  onLoadFile,
+  currentFileId,
+  onRename,
+  currentFileName,
+}: Props) => {
   return (
     <>
       <DefaultSidebar.Content>
@@ -17,6 +24,8 @@ export const AppSidebar = ({ onLoadFile, currentFileId }: Props) => {
           <FileListSidebar
             onLoadFile={onLoadFile}
             currentFileId={currentFileId}
+            onRename={onRename}
+            currentFileName={currentFileName}
           />
         </Sidebar.Tab>
       </DefaultSidebar.Content>

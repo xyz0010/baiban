@@ -639,13 +639,18 @@ const drawElementFromCanvas = (
         elementWithCanvas.canvas!.height) /
       2;
     context.translate(cx, cy);
-    context.drawImage(
-      elementWithCanvas.boundTextCanvas,
-      (-(x2 - x1) / 2) * window.devicePixelRatio - offsetX / zoom - padding,
-      (-(y2 - y1) / 2) * window.devicePixelRatio - offsetY / zoom - padding,
-      elementWithCanvas.boundTextCanvas.width / zoom,
-      elementWithCanvas.boundTextCanvas.height / zoom,
-    );
+    if (
+      elementWithCanvas.boundTextCanvas.width > 0 &&
+      elementWithCanvas.boundTextCanvas.height > 0
+    ) {
+      context.drawImage(
+        elementWithCanvas.boundTextCanvas,
+        (-(x2 - x1) / 2) * window.devicePixelRatio - offsetX / zoom - padding,
+        (-(y2 - y1) / 2) * window.devicePixelRatio - offsetY / zoom - padding,
+        elementWithCanvas.boundTextCanvas.width / zoom,
+        elementWithCanvas.boundTextCanvas.height / zoom,
+      );
+    }
   } else {
     // we translate context to element center so that rotation and scale
     // originates from the element center

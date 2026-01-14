@@ -244,6 +244,19 @@ export const IMAGE_MIME_TYPES = {
   mp4: "video/mp4",
 } as const;
 
+export const ATTACHMENT_MIME_TYPES = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  zip: "application/zip",
+  rar: "application/x-rar-compressed",
+  "7z": "application/x-7z-compressed",
+} as const;
+
 export const STRING_MIME_TYPES = {
   text: "text/plain",
   html: "text/html",
@@ -265,6 +278,8 @@ export const MIME_TYPES = {
   binary: "application/octet-stream",
   // image
   ...IMAGE_MIME_TYPES,
+  // attachments
+  ...ATTACHMENT_MIME_TYPES,
 } as const;
 
 export const ALLOWED_PASTE_MIME_TYPES = [

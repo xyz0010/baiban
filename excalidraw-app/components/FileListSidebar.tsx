@@ -14,9 +14,16 @@ import "./FileListSidebar.scss";
 interface Props {
   onLoadFile: (id: string) => void;
   currentFileId: string | null;
+  onRename: (id: string, newName: string) => void;
+  currentFileName?: string;
 }
 
-export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
+export const FileListSidebar = ({
+  onLoadFile,
+  currentFileId,
+  onRename,
+  currentFileName,
+}: Props) => {
   const [files, setFiles] = useState<LocalFileMetadata[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -31,7 +38,7 @@ export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
 
   useEffect(() => {
     refreshFiles();
-  }, [currentFileId]);
+  }, [currentFileId, currentFileName]);
 
   const handleCreate = async () => {
     const newFile = await createNewFile();
@@ -70,6 +77,7 @@ export const FileListSidebar = ({ onLoadFile, currentFileId }: Props) => {
   const handleRename = async () => {
     if (editingId) {
       await renameFile(editingId, editingName);
+      onRename(editingId, editingName);
       setEditingId(null);
       refreshFiles();
     }

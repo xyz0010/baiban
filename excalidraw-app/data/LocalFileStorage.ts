@@ -23,6 +23,12 @@ export interface LocalFileData {
   appState: Partial<AppState>;
 }
 
+export const getFileMetadata = async (
+  id: string,
+): Promise<LocalFileMetadata | undefined> => {
+  return await get(id, metadataStore);
+};
+
 export const getFilesMetadata = async (): Promise<LocalFileMetadata[]> => {
   const metadata = await entries(metadataStore);
   return metadata

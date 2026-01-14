@@ -112,9 +112,11 @@ export type BinaryFileData = {
   mimeType:
     | ValueOf<typeof IMAGE_MIME_TYPES>
     // future user or unknown file type
-    | typeof MIME_TYPES.binary;
+    | typeof MIME_TYPES.binary
+    | string;
   id: FileId;
   dataURL: DataURL;
+  name?: string;
   /**
    * Epoch timestamp in milliseconds
    */
@@ -725,7 +727,7 @@ export type AppClassProperties = {
     FileId,
     {
       image: HTMLImageElement | Promise<HTMLImageElement>;
-      mimeType: ValueOf<typeof IMAGE_MIME_TYPES>;
+      mimeType: string;
     }
   >;
   files: BinaryFiles;

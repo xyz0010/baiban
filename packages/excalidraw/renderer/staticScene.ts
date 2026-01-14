@@ -209,7 +209,9 @@ const renderLinkIcon = (
 
       linkCanvasCacheContext.restore();
     }
-    context.drawImage(linkCanvas, x - centerX, y - centerY, width, height);
+    if (linkCanvas.width > 0 && linkCanvas.height > 0) {
+      context.drawImage(linkCanvas, x - centerX, y - centerY, width, height);
+    }
     context.restore();
   }
 };

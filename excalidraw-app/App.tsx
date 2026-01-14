@@ -40,6 +40,7 @@ import {
   parseLibraryTokensFromUrl,
   useHandleLibrary,
 } from "@excalidraw/excalidraw/data/library";
+import { fileOpen } from "@excalidraw/excalidraw/data/filesystem";
 
 import type { RestoredDataState } from "@excalidraw/excalidraw/data/restore";
 import type {
@@ -92,6 +93,7 @@ import {
   loadFile,
   getFilesMetadata,
   createNewFile,
+  getFileMetadata,
 } from "./data/LocalFileStorage";
 import { useAtomValue } from "./app-jotai";
 
@@ -210,6 +212,7 @@ const ExcalidrawWrapper = () => {
   const [langCode, setLangCode] = useAppLangCode();
 
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string>("");
 
   const [excalidrawAPI, excalidrawRefCallback] =
     useCallbackRefState<ExcalidrawImperativeAPI>();
@@ -219,15 +222,54 @@ const ExcalidrawWrapper = () => {
       const fileData = await loadFile(id);
       if (fileData && excalidrawAPI) {
         setCurrentFileId(id);
+        const metadata = await getFileMetadata(id);
+        let name = fileData.appState.name;
+        if (metadata) {
+          setCurrentFileName(metadata.name);
+          name = metadata.name;
+        }
         excalidrawAPI.updateScene({
           elements: fileData.elements,
-          appState: fileData.appState as any,
+          appState: { ...fileData.appState, name, fileHandle: null } as any,
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         });
       }
     },
     [excalidrawAPI],
   );
+
+  const handleFileRenamed = useCallback(
+    (id: string, newName: string) => {
+      if (id === currentFileId) {
+        setCurrentFileName(newName);
+        if (excalidrawAPI) {
+          excalidrawAPI.updateScene({
+            appState: { name: newName },
+          });
+        }
+      }
+    },
+    [currentFileId, excalidrawAPI],
+  );
+
+  const handleImportFile = async () => {
+    try {
+      const file = await fileOpen({
+        description: "Excalidraw files",
+        extensions: ["excalidraw"],
+      });
+      const { appState, elements } = await loadFromBlob(file, null, null);
+      const name = file.name.replace(/\.excalidraw$/, "");
+      const newFile = await createNewFile(name);
+      await saveFile(newFile.id, elements, appState, name);
+      handleLoadFile(newFile.id);
+    } catch (error: any) {
+      if (error.name !== "AbortError") {
+        console.error(error);
+        setErrorMessage(error.message);
+      }
+    }
+  };
 
   useEffect(() => {
     const initFile = async () => {
@@ -507,7 +549,13 @@ const ExcalidrawWrapper = () => {
     files: BinaryFiles,
   ) => {
     if (currentFileId) {
-      saveFile(currentFileId, elements, appState);
+      const name = appState.fileHandle?.name
+        ? appState.fileHandle.name.replace(/\.excalidraw$/, "")
+        : appState.name;
+      saveFile(currentFileId, elements, appState, name || undefined);
+      if (name && name !== currentFileName) {
+        setCurrentFileName(name);
+      }
     }
 
     // this check is redundant, but since this is a hot path, it's best
@@ -610,6 +658,7 @@ const ExcalidrawWrapper = () => {
     <div style={{ height: "100%" }} className={clsx("excalidraw-app")}>
       <Excalidraw
         excalidrawAPI={excalidrawRefCallback}
+        name={currentFileName}
         onChange={onChange}
         initialData={initialStatePromiseRef.current.promise}
         aiEnabled={false}
@@ -638,6 +687,7 @@ const ExcalidrawWrapper = () => {
           theme={appTheme}
           setTheme={(theme) => setAppTheme(theme)}
           refresh={() => forceRefresh((prev) => !prev)}
+          onImportFile={handleImportFile}
         />
         <AppWelcomeScreen />
         <OverwriteConfirmDialog>
@@ -653,7 +703,11 @@ const ExcalidrawWrapper = () => {
           </div>
         )}
 
-        <AppSidebar onLoadFile={handleLoadFile} currentFileId={currentFileId} />
+        <AppSidebar
+          onLoadFile={handleLoadFile}
+          currentFileId={currentFileId}
+          onRename={handleFileRenamed}
+        />
 
         {errorMessage && (
           <ErrorDialog onClose={() => setErrorMessage("")}>

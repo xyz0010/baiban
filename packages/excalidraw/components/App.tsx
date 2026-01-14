@@ -27,6 +27,7 @@ import {
   isArrowKey,
   KEYS,
   APP_NAME,
+  ATTACHMENT_MIME_TYPES,
   CURSOR_TYPE,
   DEFAULT_VERTICAL_ALIGN,
   DRAGGING_THRESHOLD,
@@ -251,6 +252,8 @@ import {
   convertToExcalidrawElements,
   type ExcalidrawElementSkeleton,
 } from "@excalidraw/element";
+
+import { dataURLToFile } from "../data/blob";
 
 import type { GlobalPoint, LocalPoint, Radians } from "@excalidraw/math";
 
@@ -1648,6 +1651,12 @@ class App extends React.Component<AppProps, AppState> {
                             }}
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.play().catch(() => {});
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.pause();
+                            }}
                           />
                         );
                       })()
@@ -3511,10 +3520,27 @@ class App extends React.Component<AppProps, AppState> {
       return;
     }
 
-    // ------------------- Images or SVG code -------------------
-    const imageFiles = dataTransferFiles.map((data) => data.file);
+    // ------------------- Images, SVG, or Attachments -------------------
+    const files = dataTransferFiles.map((data) => data.file);
+    const imageFiles: File[] = [];
+    const attachmentFiles: File[] = [];
 
-    if (imageFiles.length === 0 && data.text && !isPlainPaste) {
+    files.forEach((file) => {
+      if (file.type.startsWith("image/") || file.type === "video/mp4") {
+        imageFiles.push(file);
+      } else if (
+        Object.values(ATTACHMENT_MIME_TYPES).includes(file.type as any)
+      ) {
+        attachmentFiles.push(file);
+      }
+    });
+
+    if (
+      imageFiles.length === 0 &&
+      attachmentFiles.length === 0 &&
+      data.text &&
+      !isPlainPaste
+    ) {
       const trimmedText = data.text.trim();
       if (trimmedText.startsWith("<svg") && trimmedText.endsWith("</svg>")) {
         // ignore SVG validation/normalization which will be done during image
@@ -3523,11 +3549,16 @@ class App extends React.Component<AppProps, AppState> {
       }
     }
 
-    if (imageFiles.length > 0) {
-      if (this.isToolSupported("image")) {
-        await this.insertImages(imageFiles, sceneX, sceneY);
-      } else {
-        this.setState({ errorMessage: t("errors.imageToolNotSupported") });
+    if (imageFiles.length > 0 || attachmentFiles.length > 0) {
+      if (imageFiles.length > 0) {
+        if (this.isToolSupported("image")) {
+          await this.insertImages(imageFiles, sceneX, sceneY);
+        } else {
+          this.setState({ errorMessage: t("errors.imageToolNotSupported") });
+        }
+      }
+      if (attachmentFiles.length > 0) {
+        await this.insertAttachments(attachmentFiles, sceneX, sceneY);
       }
       return;
     }
@@ -6066,6 +6097,77 @@ class App extends React.Component<AppProps, AppState> {
   private handleCanvasDoubleClick = (
     event: React.MouseEvent<HTMLCanvasElement>,
   ) => {
+    const selectedElements = this.scene.getSelectedElements(this.state);
+    if (selectedElements.length === 1 && selectedElements[0].type === "image") {
+      const element = selectedElements[0] as ExcalidrawImageElement;
+      if (!element.fileId) {
+        return;
+      }
+      const fileData = this.files[element.fileId];
+      if (
+        fileData &&
+        !Object.values(IMAGE_MIME_TYPES).includes(fileData.mimeType as any)
+      ) {
+        if (fileData.mimeType === ATTACHMENT_MIME_TYPES.pdf) {
+          const file = dataURLToFile(
+            fileData.dataURL,
+            fileData.name || "document.pdf",
+          );
+          const url = URL.createObjectURL(file);
+          window.open(url);
+          return;
+        }
+
+        const OFFICE_MIME_TYPES = [
+          ATTACHMENT_MIME_TYPES.doc,
+          ATTACHMENT_MIME_TYPES.docx,
+          ATTACHMENT_MIME_TYPES.xls,
+          ATTACHMENT_MIME_TYPES.xlsx,
+          ATTACHMENT_MIME_TYPES.ppt,
+          ATTACHMENT_MIME_TYPES.pptx,
+        ];
+
+        if (OFFICE_MIME_TYPES.includes(fileData.mimeType as any)) {
+          if (
+            fileData.dataURL.startsWith("http") &&
+            !fileData.dataURL.startsWith("http://localhost") &&
+            !fileData.dataURL.startsWith("https://localhost")
+          ) {
+            window.open(
+              `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+                fileData.dataURL,
+              )}`,
+            );
+          } else {
+            const file = dataURLToFile(
+              fileData.dataURL,
+              fileData.name || "document",
+            );
+            const url = URL.createObjectURL(file);
+            window.open(url);
+          }
+          return;
+        }
+
+        // Trigger download
+        const link = document.createElement("a");
+        link.href = fileData.dataURL;
+        link.download =
+          fileData.name ||
+          `attachment.${
+            Object.keys(ATTACHMENT_MIME_TYPES).find(
+              (key) =>
+                ATTACHMENT_MIME_TYPES[key as keyof typeof ATTACHMENT_MIME_TYPES] ===
+                fileData.mimeType,
+            ) || "bin"
+          }`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+    }
+
     // case: double-clicking with arrow/line tool selected would both create
     // text and enter multiElement mode
     if (this.state.multiElement) {
@@ -6075,8 +6177,6 @@ class App extends React.Component<AppProps, AppState> {
     if (this.state.activeTool.type !== this.state.preferredSelectionTool.type) {
       return;
     }
-
-    const selectedElements = this.scene.getSelectedElements(this.state);
 
     let { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
       event,
@@ -11117,6 +11217,7 @@ class App extends React.Component<AppProps, AppState> {
               mimeType,
               id: fileId,
               dataURL,
+              name: imageFile.name,
               created: Date.now(),
               lastRetrieved: Date.now(),
             },
@@ -11440,6 +11541,170 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
+  private initializeAttachment = async (
+    placeholderImageElement: ExcalidrawImageElement,
+    attachmentFile: File,
+  ) => {
+    // skip isSupportedImageFile check as we are handling attachments
+
+    const mimeType = attachmentFile.type || "application/octet-stream";
+
+    setCursor(this.interactiveCanvas, "wait");
+
+    // generate image id (by default the file digest) before any
+    // resizing/compression takes place to keep it more portable
+    const fileId = await ((this.props.generateIdForFile?.(
+      attachmentFile,
+    ) as Promise<FileId>) || generateIdFromFile(attachmentFile));
+
+    if (!fileId) {
+      console.warn(
+        "Couldn't generate file id or the supplied `generateIdForFile` didn't resolve to one.",
+      );
+      throw new Error(t("errors.imageInsertError"));
+    }
+
+    const existingFileData = this.files[fileId];
+    if (!existingFileData?.dataURL) {
+      if (attachmentFile.size > MAX_ALLOWED_FILE_BYTES) {
+        throw new Error(
+          t("errors.fileTooBig", {
+            maxSize: `${Math.trunc(MAX_ALLOWED_FILE_BYTES / 1024 / 1024)}MB`,
+          }),
+        );
+      }
+    }
+
+    const dataURL =
+      this.files[fileId]?.dataURL || (await getDataURL(attachmentFile));
+
+    return new Promise<NonDeleted<InitializedExcalidrawImageElement>>(
+      async (resolve, reject) => {
+        try {
+          let initializedImageElement = this.getLatestInitializedImageElement(
+            placeholderImageElement,
+            fileId,
+          );
+
+          this.addMissingFiles([
+            {
+              mimeType,
+              id: fileId,
+              dataURL,
+              name: attachmentFile.name,
+              created: Date.now(),
+              lastRetrieved: Date.now(),
+            },
+          ]);
+
+          if (!this.imageCache.get(fileId)) {
+            this.addNewImagesToImageCache();
+
+            const { erroredFiles } = await this.updateImageCache([
+              initializedImageElement,
+            ]);
+
+            if (erroredFiles.size) {
+              throw new Error("Image cache update resulted with an error.");
+            }
+          }
+
+          const imageHTML = await this.imageCache.get(fileId)?.image;
+
+          if (
+            imageHTML &&
+            this.state.newElement?.id !== initializedImageElement.id
+          ) {
+            initializedImageElement = this.getLatestInitializedImageElement(
+              placeholderImageElement,
+              fileId,
+            );
+            // Center the element
+            Object.assign(initializedImageElement, {
+              x:
+                initializedImageElement.x +
+                (initializedImageElement.width - imageHTML.width) / 2,
+              y:
+                initializedImageElement.y +
+                (initializedImageElement.height - imageHTML.height) / 2,
+              width: imageHTML.width,
+              height: imageHTML.height,
+            });
+          }
+
+          resolve(initializedImageElement);
+        } catch (error) {
+          reject(error);
+        } finally {
+          setCursor(this.interactiveCanvas, "auto");
+        }
+      },
+    );
+  };
+
+  private insertAttachments = async (
+    attachmentFiles: File[],
+    sceneX: number,
+    sceneY: number,
+  ) => {
+    const gridPadding = 50 / this.state.zoom.value;
+    // Create, position, and insert placeholders
+    const placeholders = positionElementsOnGrid(
+      attachmentFiles.map(() => this.newImagePlaceholder({ sceneX, sceneY })),
+      sceneX,
+      sceneY,
+      gridPadding,
+    );
+
+    placeholders.forEach((el) => this.scene.insertElement(el));
+
+    // Create, position, insert and select initialized (replacing placeholders)
+    const initialized = await Promise.all(
+      placeholders.map(async (placeholder, i) => {
+        try {
+          return await this.initializeAttachment(
+            placeholder,
+            await normalizeFile(attachmentFiles[i]),
+          );
+        } catch (error: any) {
+          this.setState({
+            errorMessage: error.message || t("errors.imageInsertError"),
+          });
+          return newElementWith(placeholder, { isDeleted: true });
+        }
+      }),
+    );
+    const initializedMap = arrayToMap(initialized);
+
+    const positioned = positionElementsOnGrid(
+      initialized.filter((el) => !el.isDeleted),
+      sceneX,
+      sceneY,
+      gridPadding,
+    );
+    const positionedMap = arrayToMap(positioned);
+
+    const nextElements = this.scene
+      .getElementsIncludingDeleted()
+      .map((el) => positionedMap.get(el.id) ?? initializedMap.get(el.id) ?? el);
+
+    this.updateScene({
+      appState: {
+        selectedElementIds: makeNextSelectedElementIds(
+          Object.fromEntries(positioned.map((el) => [el.id, true])),
+          this.state,
+        ),
+      },
+      elements: nextElements,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+
+    this.setState({}, () => {
+      // actionFinalize after all state values have been updated
+      this.actionManager.executeAction(actionFinalize);
+    });
+  };
+
   private initializeVideo = async (
     placeholder: ExcalidrawElement,
     videoFile: File,
@@ -11624,9 +11889,29 @@ class App extends React.Component<AppProps, AppState> {
       .map((data) => data.file)
       .filter((file) => isSupportedImageFile(file));
 
-    if (imageFiles.length > 0 && this.isToolSupported("image")) {
-      return this.insertImages(imageFiles, sceneX, sceneY);
+    const attachmentFiles = fileItems
+      .map((data) => data.file)
+      .filter(
+        (file) =>
+          Object.values(ATTACHMENT_MIME_TYPES).includes(file.type as any) ||
+          Object.keys(ATTACHMENT_MIME_TYPES).some((ext) =>
+            file.name.endsWith(`.${ext}`),
+          ),
+      );
+
+    if (
+      (imageFiles.length > 0 || attachmentFiles.length > 0) &&
+      this.isToolSupported("image")
+    ) {
+      if (imageFiles.length > 0) {
+        await this.insertImages(imageFiles, sceneX, sceneY);
+      }
+      if (attachmentFiles.length > 0) {
+        await this.insertAttachments(attachmentFiles, sceneX, sceneY);
+      }
+      return;
     }
+
     const excalidrawLibrary_ids = dataTransferList.getData(
       MIME_TYPES.excalidrawlibIds,
     );

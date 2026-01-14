@@ -1,8 +1,9 @@
 import React from "react";
 
 import { isDevEnv } from "@excalidraw/common";
-import { eyeIcon } from "@excalidraw/excalidraw/components/icons";
+import { eyeIcon, LoadIcon } from "@excalidraw/excalidraw/components/icons";
 import { MainMenu } from "@excalidraw/excalidraw/index";
+import { t } from "@excalidraw/excalidraw/i18n";
 
 import type { Theme } from "@excalidraw/element/types";
 
@@ -14,10 +15,13 @@ export const AppMainMenu: React.FC<{
   theme: Theme | "system";
   setTheme: (theme: Theme | "system") => void;
   refresh: () => void;
+  onImportFile: () => void;
 }> = React.memo((props) => {
   return (
     <MainMenu>
-      <MainMenu.DefaultItems.LoadScene />
+      <MainMenu.Item onSelect={props.onImportFile} icon={LoadIcon}>
+        {t("buttons.load")}
+      </MainMenu.Item>
       <MainMenu.DefaultItems.SaveToActiveFile />
       <MainMenu.DefaultItems.Export />
       <MainMenu.DefaultItems.SaveAsImage />
