@@ -79,6 +79,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "build",
+      chunkSizeWarningLimit: 2000,
       rollupOptions: {
         output: {
           assetFileNames(chunkInfo) {
@@ -101,6 +102,13 @@ export default defineConfig(({ mode }) => {
               const index = id.indexOf("locales/");
               // Taking the substring after "locales/"
               return `locales/${id.substring(index + 8)}`;
+            }
+
+            if (id.includes("node_modules")) {
+              if (id.includes("pdfjs-dist")) {
+                return "pdfjs-dist";
+              }
+              return "vendor";
             }
           },
         },
