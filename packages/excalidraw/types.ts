@@ -46,6 +46,7 @@ import type {
   CaptureUpdateActionType,
   DurableIncrement,
   EphemeralIncrement,
+  Store,
 } from "@excalidraw/element";
 
 import type { Action } from "./actions/types";
@@ -62,6 +63,8 @@ import type { Language } from "./i18n";
 import type { isOverScrollBars } from "./scene/scrollbars";
 import type React from "react";
 import type { JSX } from "react";
+import type { ActionManager } from "./actions/manager";
+import type { History } from "./history";
 
 export type SocketId = string & { _brand: "SocketId" };
 
@@ -764,6 +767,9 @@ export type AppClassProperties = {
   onPointerDownEmitter: App["onPointerDownEmitter"];
 
   bindModeHandler: App["bindModeHandler"];
+  store: Store;
+  history: History;
+  actionManager: ActionManager;
 };
 
 export type PointerDownState = Readonly<{

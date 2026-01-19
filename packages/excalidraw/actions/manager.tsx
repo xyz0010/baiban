@@ -78,6 +78,16 @@ export class ActionManager {
     this.app = app;
   }
 
+  private setNextActionName(action: Action) {
+    const elements = this.getElementsIncludingDeleted();
+    const appState = this.getAppState();
+    const label =
+      typeof action.label === "function"
+        ? action.label(elements, appState, this.app)
+        : action.label;
+    this.app.store.setNextActionName(label || action.name);
+  }
+
   registerAction(action: Action) {
     this.actions[action.name] = action;
   }
@@ -125,6 +135,7 @@ export class ActionManager {
 
     event.preventDefault();
     event.stopPropagation();
+    this.setNextActionName(action);
     this.updater(data[0].perform(elements, appState, value, this.app));
     return true;
   }
@@ -139,6 +150,7 @@ export class ActionManager {
 
     trackAction(action, source, appState, elements, this.app, value);
 
+    this.setNextActionName(action);
     this.updater(action.perform(elements, appState, value, this.app));
   }
 
@@ -163,6 +175,7 @@ export class ActionManager {
       const updateData = (formState?: any) => {
         trackAction(action, "ui", appState, elements, this.app, formState);
 
+        this.setNextActionName(action);
         this.updater(
           action.perform(
             this.getElementsIncludingDeleted(),

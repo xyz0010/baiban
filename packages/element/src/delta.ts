@@ -1203,14 +1203,19 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       const prevElement = prevElements.get(nextElement.id);
 
       if (!prevElement) {
+        // if the element has version 0 (or less), we need to bump it to 1 to satisfy invariants
+        // (deleted.version >= 0 && deleted.version !== inserted.version)
+        const version = nextElement.version < 1 ? 1 : nextElement.version;
+
         const deleted = {
           isDeleted: true,
-          version: nextElement.version - 1,
+          version: version - 1,
           versionNonce: randomInteger(),
         } as ElementPartial;
 
         const inserted = {
           ...nextElement,
+          version,
         } as ElementPartial;
 
         const delta = Delta.create(

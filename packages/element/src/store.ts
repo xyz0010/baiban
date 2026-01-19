@@ -85,6 +85,7 @@ export class Store {
 
   private scheduledMacroActions: Set<CaptureUpdateActionType> = new Set();
   private scheduledMicroActions: MicroActionsQueue = [];
+  private nextActionName: string | null = null;
 
   private _snapshot = StoreSnapshot.empty();
 
@@ -97,6 +98,10 @@ export class Store {
   }
 
   constructor(private readonly app: App) {}
+
+  public setNextActionName(name: string) {
+    this.nextActionName = name;
+  }
 
   public scheduleAction(action: CaptureUpdateActionType) {
     this.scheduledMacroActions.add(action);
@@ -238,7 +243,12 @@ export class Store {
     }
 
     if (!storeDelta.isEmpty()) {
-      const increment = new DurableIncrement(storeChange, storeDelta);
+      const increment = new DurableIncrement(
+        storeChange,
+        storeDelta,
+        this.nextActionName || undefined,
+      );
+      this.nextActionName = null;
 
       this.onDurableIncrementEmitter.trigger(increment);
       this.onStoreIncrementEmitter.trigger(increment);
@@ -477,6 +487,7 @@ export class DurableIncrement extends StoreIncrement {
   constructor(
     public readonly change: StoreChange,
     public readonly delta: StoreDelta,
+    public readonly actionName?: string,
   ) {
     super("durable", change);
   }

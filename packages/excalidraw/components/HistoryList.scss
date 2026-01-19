@@ -1,0 +1,41 @@
+.history-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  height: 100%;
+  background-color: var(--island-bg-color);
+  color: var(--text-primary-color);
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+
+  .history-entry {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--button-gray-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    &:hover {
+      background-color: var(--button-gray-1);
+    }
+
+    &.active {
+      background-color: var(--color-primary-light);
+      font-weight: bold;
+    }
+
+    .history-entry-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .history-entry-time {
+      color: var(--text-secondary-color);
+      font-size: 0.7rem;
+      margin-left: 8px;
+    }
+  }
+}

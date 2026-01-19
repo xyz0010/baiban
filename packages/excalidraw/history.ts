@@ -87,13 +87,19 @@ export class HistoryChangedEvent {
   ) {}
 }
 
+export interface HistoryEntry {
+  delta: HistoryDelta;
+  name?: string;
+  timestamp: number;
+}
+
 export class History {
   public readonly onHistoryChangedEmitter = new Emitter<
     [HistoryChangedEvent]
   >();
 
-  public readonly undoStack: HistoryDelta[] = [];
-  public readonly redoStack: HistoryDelta[] = [];
+  public readonly undoStack: HistoryEntry[] = [];
+  public readonly redoStack: HistoryEntry[] = [];
 
   public get isUndoStackEmpty() {
     return this.undoStack.length === 0;
@@ -114,7 +120,7 @@ export class History {
    * Record a non-empty local durable increment, which will go into the undo stack..
    * Do not re-record history entries, which were already pushed to undo / redo stack, as part of history action.
    */
-  public record(delta: StoreDelta) {
+  public record(delta: StoreDelta, name?: string) {
     if (delta.isEmpty() || delta instanceof HistoryDelta) {
       return;
     }
@@ -122,7 +128,11 @@ export class History {
     // construct history entry, so once it's emitted, it's not recorded again
     const historyDelta = HistoryDelta.inverse(delta);
 
-    this.undoStack.push(historyDelta);
+    this.undoStack.push({
+      delta: historyDelta,
+      name,
+      timestamp: Date.now(),
+    });
 
     if (!historyDelta.elements.isEmpty()) {
       // don't reset redo stack on local appState changes,
@@ -141,7 +151,7 @@ export class History {
       elements,
       appState,
       () => History.pop(this.undoStack),
-      (entry: HistoryDelta) => History.push(this.redoStack, entry),
+      (entry: HistoryEntry) => History.push(this.redoStack, entry),
     );
   }
 
@@ -150,22 +160,24 @@ export class History {
       elements,
       appState,
       () => History.pop(this.redoStack),
-      (entry: HistoryDelta) => History.push(this.undoStack, entry),
+      (entry: HistoryEntry) => History.push(this.undoStack, entry),
     );
   }
 
   private perform(
     elements: SceneElementsMap,
     appState: AppState,
-    pop: () => HistoryDelta | null,
-    push: (entry: HistoryDelta) => void,
+    pop: () => HistoryEntry | null,
+    push: (entry: HistoryEntry) => void,
   ): [SceneElementsMap, AppState] | void {
     try {
-      let historyDelta = pop();
+      let entry = pop();
 
-      if (historyDelta === null) {
+      if (entry === null) {
         return;
       }
+
+      let historyDelta = entry.delta;
 
       const action = CaptureUpdateAction.IMMEDIATELY;
 
@@ -208,14 +220,19 @@ export class History {
 
           prevSnapshot = nextSnapshot;
         } finally {
-          push(historyDelta);
+          push({ ...entry, delta: historyDelta });
         }
 
         if (containsVisibleChange) {
           break;
         }
 
-        historyDelta = pop();
+        entry = pop();
+        if (entry) {
+          historyDelta = entry.delta;
+        } else {
+          break;
+        }
       }
 
       return [nextElements, nextAppState];
@@ -228,7 +245,7 @@ export class History {
     }
   }
 
-  private static pop(stack: HistoryDelta[]): HistoryDelta | null {
+  private static pop(stack: HistoryEntry[]): HistoryEntry | null {
     if (!stack.length) {
       return null;
     }
@@ -242,8 +259,12 @@ export class History {
     return null;
   }
 
-  private static push(stack: HistoryDelta[], entry: HistoryDelta) {
-    const inversedEntry = HistoryDelta.inverse(entry);
-    return stack.push(inversedEntry);
+  private static push(stack: HistoryEntry[], entry: HistoryEntry) {
+    const inversedDelta = HistoryDelta.inverse(entry.delta);
+    return stack.push({
+      delta: inversedDelta,
+      name: entry.name,
+      timestamp: entry.timestamp,
+    });
   }
 }

@@ -680,7 +680,7 @@ describe("history", () => {
 
         // need to check that delta actually contains initialized image elements (with fileId & natural dimensions)
         expect(
-          Object.values(h.history.undoStack[0].elements.removed).map(
+          Object.values(h.history.undoStack[0].delta.elements.removed).map(
             (val) => val.deleted,
           ),
         ).toEqual([

@@ -614,8 +614,8 @@ class App extends React.Component<AppProps, AppState> {
   public library: AppClassProperties["library"];
   public libraryItemsFromStorage: LibraryItems | undefined;
   public id: string;
-  private store: Store;
-  private history: History;
+  public store: Store;
+  public history: History;
   public excalidrawContainerValue: {
     container: HTMLDivElement | null;
     id: string;
@@ -2954,7 +2954,31 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     this.store.onDurableIncrementEmitter.on((increment) => {
-      this.history.record(increment.delta);
+      if (increment.delta.elements.isEmpty()) {
+        const appStateDelta = increment.delta.appState.delta;
+        const changedKeys = new Set([
+          ...Object.keys(appStateDelta.deleted),
+          ...Object.keys(appStateDelta.inserted),
+        ]);
+
+        const selectionKeys = [
+          "selectedElementIds",
+          "selectedGroupIds",
+          "selectedLinearElement",
+          "editingGroupId",
+          "activeLockedId",
+          "lockedMultiSelections",
+        ];
+
+        const isOnlySelection = [...changedKeys].every((key) =>
+          selectionKeys.includes(key),
+        );
+
+        if (isOnlySelection) {
+          return;
+        }
+      }
+      this.history.record(increment.delta, increment.actionName);
     });
 
     const { onIncrement } = this.props;

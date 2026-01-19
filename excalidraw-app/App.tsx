@@ -233,6 +233,39 @@ const ExcalidrawWrapper = () => {
           appState: { ...fileData.appState, name, fileHandle: null } as any,
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         });
+
+        // Load files (images/videos) from global storage
+        const fileIds =
+          fileData.elements.reduce((acc, element) => {
+            if (isInitializedImageElement(element)) {
+              return acc.concat(element.fileId);
+            }
+            if (
+              element.type === "embeddable" &&
+              element.link &&
+              element.link.startsWith("video-file:")
+            ) {
+              return acc.concat(
+                element.link.replace("video-file:", "") as FileId,
+              );
+            }
+            return acc;
+          }, [] as FileId[]) || [];
+
+        if (fileIds.length) {
+          LocalData.fileStorage
+            .getFiles(fileIds)
+            .then(({ loadedFiles, erroredFiles }) => {
+              if (loadedFiles.length) {
+                excalidrawAPI.addFiles(loadedFiles);
+              }
+              updateStaleImageStatuses({
+                excalidrawAPI,
+                erroredFiles,
+                elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
+              });
+            });
+        }
       }
     },
     [excalidrawAPI],
@@ -258,10 +291,20 @@ const ExcalidrawWrapper = () => {
         description: "Excalidraw files",
         extensions: ["excalidraw"],
       });
-      const { appState, elements } = await loadFromBlob(file, null, null);
+      const { appState, elements, files } = await loadFromBlob(
+        file,
+        null,
+        null,
+      );
       const name = file.name.replace(/\.excalidraw$/, "");
       const newFile = await createNewFile(name);
       await saveFile(newFile.id, elements, appState, name);
+      if (files) {
+        await LocalData.fileStorage.saveFiles({
+          elements,
+          files,
+        });
+      }
       handleLoadFile(newFile.id);
     } catch (error: any) {
       if (error.name !== "AbortError") {

@@ -452,11 +452,14 @@ export const checkpointHistory = (history: History, name: string) => {
   expect(
     history.undoStack.map((x) => ({
       ...x,
-      elements: {
-        ...x.elements,
-        added: stripProps(x.elements.added, ["seed", "versionNonce"]),
-        removed: stripProps(x.elements.removed, ["seed", "versionNonce"]),
-        updated: stripProps(x.elements.updated, ["seed", "versionNonce"]),
+      delta: {
+        ...x.delta,
+        elements: {
+          ...x.delta.elements,
+          added: stripProps(x.delta.elements.added, ["seed", "versionNonce"]),
+          removed: stripProps(x.delta.elements.removed, ["seed", "versionNonce"]),
+          updated: stripProps(x.delta.elements.updated, ["seed", "versionNonce"]),
+        },
       },
     })),
   ).toMatchSnapshot(`[${name}] undo stack`);
@@ -464,11 +467,14 @@ export const checkpointHistory = (history: History, name: string) => {
   expect(
     history.redoStack.map((x) => ({
       ...x,
-      elements: {
-        ...x.elements,
-        added: stripProps(x.elements.added, ["seed", "versionNonce"]),
-        removed: stripProps(x.elements.removed, ["seed", "versionNonce"]),
-        updated: stripProps(x.elements.updated, ["seed", "versionNonce"]),
+      delta: {
+        ...x.delta,
+        elements: {
+          ...x.delta.elements,
+          added: stripProps(x.delta.elements.added, ["seed", "versionNonce"]),
+          removed: stripProps(x.delta.elements.removed, ["seed", "versionNonce"]),
+          updated: stripProps(x.delta.elements.updated, ["seed", "versionNonce"]),
+        },
       },
     })),
   ).toMatchSnapshot(`[${name}] redo stack`);
