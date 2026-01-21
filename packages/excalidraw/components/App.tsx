@@ -6118,76 +6118,133 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  private openImageAttachment = (element: ExcalidrawImageElement) => {
+    if (!element.fileId) {
+      return false;
+    }
+
+    const fileData = this.files[element.fileId];
+    if (
+      !fileData ||
+      Object.values(IMAGE_MIME_TYPES).includes(fileData.mimeType as any)
+    ) {
+      return false;
+    }
+
+    if (fileData.mimeType === ATTACHMENT_MIME_TYPES.pdf) {
+      const file = dataURLToFile(
+        fileData.dataURL,
+        fileData.name || "document.pdf",
+      );
+      const url = URL.createObjectURL(file);
+      window.open(url);
+      return true;
+    }
+
+    const OFFICE_MIME_TYPES = [
+      ATTACHMENT_MIME_TYPES.doc,
+      ATTACHMENT_MIME_TYPES.docx,
+      ATTACHMENT_MIME_TYPES.xls,
+      ATTACHMENT_MIME_TYPES.xlsx,
+      ATTACHMENT_MIME_TYPES.ppt,
+      ATTACHMENT_MIME_TYPES.pptx,
+    ];
+
+    if (OFFICE_MIME_TYPES.includes(fileData.mimeType as any)) {
+      const isRemoteURL =
+        fileData.dataURL.startsWith("http://") ||
+        fileData.dataURL.startsWith("https://");
+      const isLocalHostURL =
+        fileData.dataURL.startsWith("http://localhost") ||
+        fileData.dataURL.startsWith("https://localhost") ||
+        fileData.dataURL.startsWith("http://127.0.0.1") ||
+        fileData.dataURL.startsWith("https://127.0.0.1") ||
+        fileData.dataURL.startsWith("http://[::1]") ||
+        fileData.dataURL.startsWith("https://[::1]");
+
+      if (isRemoteURL && !isLocalHostURL) {
+        window.open(
+          `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+            fileData.dataURL,
+          )}`,
+        );
+      } else {
+        const file = dataURLToFile(
+          fileData.dataURL,
+          fileData.name || "document",
+        );
+        const url = URL.createObjectURL(file);
+        window.open(url);
+      }
+      return true;
+    }
+
+    const link = document.createElement("a");
+    link.href = fileData.dataURL;
+    link.download =
+      fileData.name ||
+      `attachment.${
+        Object.keys(ATTACHMENT_MIME_TYPES).find(
+          (key) =>
+            ATTACHMENT_MIME_TYPES[key as keyof typeof ATTACHMENT_MIME_TYPES] ===
+            fileData.mimeType,
+        ) || "bin"
+      }`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  };
+
+  private maybeOpenAttachmentOnClickInViewMode = (
+    event: React.PointerEvent<HTMLCanvasElement>,
+    scenePointer: { x: number; y: number },
+  ) => {
+    if (!this.state.viewModeEnabled || event.button !== POINTER_BUTTON.MAIN) {
+      return false;
+    }
+
+    const pointerStart = this.lastPointerDownEvent;
+    if (!pointerStart) {
+      return false;
+    }
+
+    const dx = event.clientX - pointerStart.clientX;
+    const dy = event.clientY - pointerStart.clientY;
+    if (dx * dx + dy * dy > 25) {
+      return false;
+    }
+
+    const hitElement = this.getElementAtPosition(scenePointer.x, scenePointer.y, {
+      includeLockedElements: true,
+    });
+
+    if (hitElement?.type !== "image") {
+      return false;
+    }
+
+    if (
+      this.getElementLinkAtPosition(scenePointer, hitElement) &&
+      isPointHittingLinkIcon(
+        hitElement,
+        this.scene.getNonDeletedElementsMap(),
+        this.state,
+        pointFrom(scenePointer.x, scenePointer.y),
+      )
+    ) {
+      return false;
+    }
+
+    return this.openImageAttachment(hitElement as ExcalidrawImageElement);
+  };
+
   private handleCanvasDoubleClick = (
     event: React.MouseEvent<HTMLCanvasElement>,
   ) => {
     const selectedElements = this.scene.getSelectedElements(this.state);
     if (selectedElements.length === 1 && selectedElements[0].type === "image") {
       const element = selectedElements[0] as ExcalidrawImageElement;
-      if (!element.fileId) {
-        return;
-      }
-      const fileData = this.files[element.fileId];
-      if (
-        fileData &&
-        !Object.values(IMAGE_MIME_TYPES).includes(fileData.mimeType as any)
-      ) {
-        if (fileData.mimeType === ATTACHMENT_MIME_TYPES.pdf) {
-          const file = dataURLToFile(
-            fileData.dataURL,
-            fileData.name || "document.pdf",
-          );
-          const url = URL.createObjectURL(file);
-          window.open(url);
-          return;
-        }
-
-        const OFFICE_MIME_TYPES = [
-          ATTACHMENT_MIME_TYPES.doc,
-          ATTACHMENT_MIME_TYPES.docx,
-          ATTACHMENT_MIME_TYPES.xls,
-          ATTACHMENT_MIME_TYPES.xlsx,
-          ATTACHMENT_MIME_TYPES.ppt,
-          ATTACHMENT_MIME_TYPES.pptx,
-        ];
-
-        if (OFFICE_MIME_TYPES.includes(fileData.mimeType as any)) {
-          if (
-            fileData.dataURL.startsWith("http") &&
-            !fileData.dataURL.startsWith("http://localhost") &&
-            !fileData.dataURL.startsWith("https://localhost")
-          ) {
-            window.open(
-              `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
-                fileData.dataURL,
-              )}`,
-            );
-          } else {
-            const file = dataURLToFile(
-              fileData.dataURL,
-              fileData.name || "document",
-            );
-            const url = URL.createObjectURL(file);
-            window.open(url);
-          }
-          return;
-        }
-
-        // Trigger download
-        const link = document.createElement("a");
-        link.href = fileData.dataURL;
-        link.download =
-          fileData.name ||
-          `attachment.${
-            Object.keys(ATTACHMENT_MIME_TYPES).find(
-              (key) =>
-                ATTACHMENT_MIME_TYPES[key as keyof typeof ATTACHMENT_MIME_TYPES] ===
-                fileData.mimeType,
-            ) || "bin"
-          }`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (this.openImageAttachment(element)) {
         return;
       }
     }
@@ -7794,6 +7851,9 @@ class App extends React.Component<AppProps, AppState> {
         this.redirectToLink(event, this.editorInterface.isTouchScreen);
       }
     } else if (this.state.viewModeEnabled) {
+      if (this.maybeOpenAttachmentOnClickInViewMode(event, scenePointer)) {
+        return;
+      }
       this.setState({
         activeEmbeddable: null,
         selectedElementIds: {},

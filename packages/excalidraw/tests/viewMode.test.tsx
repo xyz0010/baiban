@@ -1,8 +1,11 @@
 import React from "react";
 
 import { CURSOR_TYPE, KEYS } from "@excalidraw/common";
+import { act } from "@testing-library/react";
+import { vi } from "vitest";
 
 import { Excalidraw } from "../index";
+import type { DataURL } from "../types";
 
 import { API } from "./helpers/api";
 import { Keyboard, Pointer, UI } from "./helpers/ui";
@@ -66,5 +69,46 @@ describe("view mode", () => {
         CURSOR_TYPE.GRAB,
       );
     });
+  });
+
+  it("clicking Office attachment in view mode opens Microsoft online preview for remote URL", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    const fileId = "file-id" as any;
+    const remoteURL = "https://example.com/test.docx";
+
+    const attachmentElement = API.createElement({
+      type: "image",
+      fileId,
+      width: 200,
+      height: 120,
+    });
+
+    API.updateScene({ elements: [attachmentElement] });
+
+    act(() => {
+      // @ts-ignore
+      window.h.app.addFiles([
+        {
+          id: fileId,
+          mimeType:
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          dataURL: remoteURL as DataURL,
+          created: Date.now(),
+        },
+      ]);
+    });
+
+    API.setAppState({ viewModeEnabled: true });
+
+    mouse.clickOn(attachmentElement);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+        remoteURL,
+      )}`,
+    );
+
+    openSpy.mockRestore();
   });
 });
