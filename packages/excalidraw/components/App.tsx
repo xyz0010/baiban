@@ -6118,6 +6118,46 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  private uploadAttachmentForOfficePreview = async (
+    fileData: BinaryFileData,
+    mimeType: BinaryFileData["mimeType"],
+  ): Promise<string | null> => {
+    try {
+      const fileName = fileData.name || "document";
+      const file = await (async () => {
+        if (fileData.dataURL.startsWith("data:")) {
+          return dataURLToFile(fileData.dataURL, fileName);
+        }
+        const response = await fetch(fileData.dataURL);
+        const blob = await response.blob();
+        return new File([blob], fileName, {
+          type: (blob.type || mimeType) as string,
+        });
+      })();
+
+      const response = await fetch("/api/office-preview", {
+        method: "POST",
+        headers: {
+          "content-type": mimeType,
+          "x-file-name": encodeURIComponent(file.name || fileName),
+        },
+        body: file,
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const json = await response.json();
+      if (json && typeof json.url === "string") {
+        return json.url;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
   private openImageAttachment = (element: ExcalidrawImageElement) => {
     if (!element.fileId) {
       return false;
@@ -6172,19 +6212,51 @@ class App extends React.Component<AppProps, AppState> {
         fileData.dataURL.startsWith("http://[::1]") ||
         fileData.dataURL.startsWith("https://[::1]");
 
+      const openOfficePreview = (src: string, targetWindow?: Window | null) => {
+        const url = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+          src,
+        )}`;
+
+        if (targetWindow) {
+          targetWindow.location.href = url;
+        } else {
+          window.open(url);
+        }
+      };
+
       if (isRemoteURL && !isLocalHostURL) {
-        window.open(
-          `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
-            fileData.dataURL,
-          )}`,
-        );
+        openOfficePreview(fileData.dataURL);
       } else {
-        const file = dataURLToFile(
-          fileData.dataURL,
-          fileData.name || "document",
-        );
-        const url = URL.createObjectURL(file);
-        window.open(url);
+        const previewWindow = window.open("", "_blank");
+        void (async () => {
+          const uploadedURL = await this.uploadAttachmentForOfficePreview(
+            fileData,
+            effectiveMimeType,
+          );
+
+          if (uploadedURL) {
+            openOfficePreview(uploadedURL, previewWindow);
+            return;
+          }
+
+          const fileName = fileData.name || "document";
+          const file = await (async () => {
+            if (fileData.dataURL.startsWith("data:")) {
+              return dataURLToFile(fileData.dataURL, fileName);
+            }
+            const response = await fetch(fileData.dataURL);
+            const blob = await response.blob();
+            return new File([blob], fileName, {
+              type: (blob.type || effectiveMimeType) as string,
+            });
+          })();
+          const url = URL.createObjectURL(file);
+          if (previewWindow) {
+            previewWindow.location.href = url;
+          } else {
+            window.open(url);
+          }
+        })();
       }
       return true;
     }

@@ -26,11 +26,14 @@ ARG VITE_APP_PLUS_EXPORT_PUBLIC_KEY
 
 RUN npm_config_target_arch=${TARGETARCH} yarn build:app:docker
 
-FROM --platform=${TARGETPLATFORM} nginx:1.27-alpine
+FROM --platform=${TARGETPLATFORM} node:20-alpine
 
-COPY --from=build /opt/node_app/excalidraw-app/build /usr/share/nginx/html
-COPY excalidraw-app/nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /opt/node_app
 
+COPY --from=build /opt/node_app/excalidraw-app/build ./public
+COPY server.js ./server.js
+
+ENV PORT=8080
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]
