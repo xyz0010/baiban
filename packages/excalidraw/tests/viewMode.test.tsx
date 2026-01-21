@@ -111,4 +111,45 @@ describe("view mode", () => {
 
     openSpy.mockRestore();
   });
+
+  it("clicking Office attachment in view mode infers type from filename when mimeType is octet-stream", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    const fileId = "file-id-2" as any;
+    const remoteURL = "https://example.com/test.docx";
+
+    const attachmentElement = API.createElement({
+      type: "image",
+      fileId,
+      width: 200,
+      height: 120,
+    });
+
+    API.updateScene({ elements: [attachmentElement] });
+
+    act(() => {
+      // @ts-ignore
+      window.h.app.addFiles([
+        {
+          id: fileId,
+          mimeType: "application/octet-stream",
+          dataURL: remoteURL as DataURL,
+          name: "test.docx",
+          created: Date.now(),
+        },
+      ]);
+    });
+
+    API.setAppState({ viewModeEnabled: true });
+
+    mouse.clickOn(attachmentElement);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+        remoteURL,
+      )}`,
+    );
+
+    openSpy.mockRestore();
+  });
 });

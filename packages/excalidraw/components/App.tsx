@@ -6131,7 +6131,17 @@ class App extends React.Component<AppProps, AppState> {
       return false;
     }
 
-    if (fileData.mimeType === ATTACHMENT_MIME_TYPES.pdf) {
+    const fileNameExt = (fileData.name || "")
+      .split(".")
+      .pop()
+      ?.toLowerCase()
+      .trim();
+    const inferredMimeTypeFromName = fileNameExt
+      ? (ATTACHMENT_MIME_TYPES as Record<string, string>)[fileNameExt]
+      : undefined;
+    const effectiveMimeType = inferredMimeTypeFromName || fileData.mimeType;
+
+    if (effectiveMimeType === ATTACHMENT_MIME_TYPES.pdf) {
       const file = dataURLToFile(
         fileData.dataURL,
         fileData.name || "document.pdf",
@@ -6150,7 +6160,7 @@ class App extends React.Component<AppProps, AppState> {
       ATTACHMENT_MIME_TYPES.pptx,
     ];
 
-    if (OFFICE_MIME_TYPES.includes(fileData.mimeType as any)) {
+    if (OFFICE_MIME_TYPES.includes(effectiveMimeType as any)) {
       const isRemoteURL =
         fileData.dataURL.startsWith("http://") ||
         fileData.dataURL.startsWith("https://");
@@ -11631,7 +11641,15 @@ class App extends React.Component<AppProps, AppState> {
   ) => {
     // skip isSupportedImageFile check as we are handling attachments
 
-    const mimeType = attachmentFile.type || "application/octet-stream";
+    const inferredMimeTypeFromName = (() => {
+      const ext = attachmentFile.name.split(".").pop()?.toLowerCase().trim();
+      return ext ? (ATTACHMENT_MIME_TYPES as Record<string, string>)[ext] : "";
+    })();
+
+    const mimeType =
+      attachmentFile.type ||
+      inferredMimeTypeFromName ||
+      "application/octet-stream";
 
     setCursor(this.interactiveCanvas, "wait");
 
