@@ -102,6 +102,16 @@ describe("Test wrapText", () => {
     expect(res2).toBe(`\tA)\none\ntab\n- two\ntabs\n- 8\nspace\ns`);
   });
 
+  it("should not wrap markdown tables as plain text", () => {
+    const text = `| Name | Value |
+| --- | --- |
+| very-very-long-text | 123 |`;
+
+    const maxWidth = 100;
+    const res = wrapText(text, font, maxWidth);
+    expect(res).toBe(text);
+  });
+
   describe("When text is CJK", () => {
     it("should break each CJK character when width is very small", () => {
       // "안녕하세요" (Hangul) + "こんにちは世界" (Hiragana, Kanji) + "ｺﾝﾆﾁハ" (Katakana) + "你好" (Han) = "Hello Hello World Hello Hi"

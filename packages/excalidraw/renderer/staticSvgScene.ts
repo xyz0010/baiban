@@ -3,9 +3,13 @@ import {
   MAX_DECIMALS_FOR_SVG_EXPORT,
   MIME_TYPES,
   SVG_NS,
+  FONT_FAMILY,
   getFontFamilyString,
+  getFontString,
+  getStyledFontString,
   isRTL,
   isTestEnv,
+  parseMarkdownToBlocks,
   getVerticalOffset,
 } from "@excalidraw/common";
 import { normalizeLink, toValidURL } from "@excalidraw/common";
@@ -18,6 +22,14 @@ import {
 import { LinearElementEditor } from "@excalidraw/element";
 import { getBoundTextElement, getContainerElement } from "@excalidraw/element";
 import { getLineHeightInPx } from "@excalidraw/element";
+import { getLineWidth } from "@excalidraw/element";
+import {
+  computeAlignedTextX,
+  computeTableCellX,
+  computeTableCellY,
+  layoutMarkdownTable,
+  measureCellLineWidth,
+} from "@excalidraw/element";
 import {
   isArrowElement,
   isIframeLikeElement,
@@ -636,25 +648,300 @@ const renderElementToSvg = (
           lineHeightPx,
         );
         const direction = isRTL(element.text) ? "rtl" : "ltr";
-        const textAnchor =
+        const baseFontString = getFontString(element);
+        const blocks = direction === "rtl" ? null : parseMarkdownToBlocks(element.text);
+        const getLegacyTextAnchor = () =>
           element.textAlign === "center"
             ? "middle"
             : element.textAlign === "right" || direction === "rtl"
-            ? "end"
-            : "start";
-        for (let i = 0; i < lines.length; i++) {
-          const text = svgRoot.ownerDocument!.createElementNS(SVG_NS, "text");
-          text.textContent = lines[i];
-          text.setAttribute("x", `${horizontalOffset}`);
-          text.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
-          text.setAttribute("font-family", getFontFamilyString(element));
-          text.setAttribute("font-size", `${element.fontSize}px`);
-          text.setAttribute("fill", element.strokeColor);
-          text.setAttribute("text-anchor", textAnchor);
-          text.setAttribute("style", "white-space: pre;");
-          text.setAttribute("direction", direction);
-          text.setAttribute("dominant-baseline", "alphabetic");
-          node.appendChild(text);
+              ? "end"
+              : "start";
+
+        const appendRuns = (textEl: SVGTextElement, runs: any[]) => {
+          for (const run of runs) {
+            if (!run.text) {
+              continue;
+            }
+            const tspan = svgRoot.ownerDocument!.createElementNS(SVG_NS, "tspan");
+            tspan.textContent = run.text;
+            if (run.bold) {
+              tspan.setAttribute("font-weight", "bold");
+            }
+            if (run.italic) {
+              tspan.setAttribute("font-style", "italic");
+            }
+            if (run.code) {
+              tspan.setAttribute(
+                "font-family",
+                getFontFamilyString({ fontFamily: FONT_FAMILY.Cascadia }),
+              );
+            }
+            if (run.link) {
+              tspan.setAttribute("fill", "#0b5fff");
+            }
+            if (run.strikethrough || run.underline) {
+              const decorations: string[] = [];
+              if (run.underline) {
+                decorations.push("underline");
+              }
+              if (run.strikethrough) {
+                decorations.push("line-through");
+              }
+              tspan.setAttribute("text-decoration", decorations.join(" "));
+            }
+            textEl.appendChild(tspan);
+          }
+        };
+
+        const getHeadingScale = (headingLevel: number) => {
+          switch (headingLevel) {
+            case 1:
+              return 2;
+            case 2:
+              return 1.5;
+            case 3:
+              return 1.25;
+            case 4:
+              return 1;
+            case 5:
+              return 0.875;
+            case 6:
+              return 0.85;
+            default:
+              return 1;
+          }
+        };
+
+        const scaleFontString = (font: string, scale: number) => {
+          if (scale === 1) {
+            return font;
+          }
+          const fontSize = parseFloat(font);
+          if (!Number.isFinite(fontSize) || fontSize <= 0) {
+            return font;
+          }
+          const nextSize = fontSize * scale;
+          return font.replace(/^(\d+(?:\.\d+)?)px\s+/, `${nextSize}px `);
+        };
+
+        if (direction === "rtl") {
+          for (let i = 0; i < lines.length; i++) {
+            const text = svgRoot.ownerDocument!.createElementNS(SVG_NS, "text");
+            text.textContent = lines[i];
+            text.setAttribute("x", `${horizontalOffset}`);
+            text.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
+            text.setAttribute("font-family", getFontFamilyString(element));
+            text.setAttribute("font-size", `${element.fontSize}px`);
+            text.setAttribute("fill", element.strokeColor);
+            text.setAttribute("text-anchor", getLegacyTextAnchor());
+            text.setAttribute("style", "white-space: pre;");
+            text.setAttribute("direction", direction);
+            text.setAttribute("dominant-baseline", "alphabetic");
+            node.appendChild(text);
+          }
+        } else {
+          let yTop = 0;
+          for (const block of blocks!) {
+            if (block.type === "line") {
+              const line = block.line;
+              const runs = line.runs;
+              const text = svgRoot.ownerDocument!.createElementNS(SVG_NS, "text");
+              const headingScale = getHeadingScale(line.headingLevel);
+              const lineFontSize = element.fontSize * headingScale;
+              const lineHeightPx = getLineHeightInPx(
+                lineFontSize,
+                element.lineHeight,
+              );
+              const verticalOffset = getVerticalOffset(
+                element.fontFamily,
+                lineFontSize,
+                lineHeightPx,
+              );
+              const lineBaseFontString = scaleFontString(
+                baseFontString,
+                headingScale,
+              );
+              let xValue = horizontalOffset;
+              let textAnchorValue = getLegacyTextAnchor();
+
+              const isPlainLine =
+                line.indentEm === 0 &&
+                !line.blockquote &&
+                !line.isCodeBlock &&
+                line.headingLevel === 0 &&
+                runs.length === 1 &&
+                !runs[0].bold &&
+                !runs[0].italic &&
+                !runs[0].strikethrough &&
+                !runs[0].underline &&
+                !runs[0].code &&
+                !runs[0].link;
+
+              if (isPlainLine) {
+                text.textContent = runs[0].text;
+              } else {
+                const indentPx = line.indentEm * element.fontSize;
+                let contentWidth = 0;
+                for (const run of runs) {
+                  if (!run.text) {
+                    continue;
+                  }
+                  const styledFontString = getStyledFontString(
+                    lineBaseFontString,
+                    run,
+                  ) as any;
+                  contentWidth += getLineWidth(run.text, styledFontString);
+                }
+                const totalWidth = indentPx + contentWidth;
+                const startX =
+                  element.textAlign === "center"
+                    ? element.width / 2 - totalWidth / 2 + indentPx
+                    : element.textAlign === "right"
+                      ? element.width - totalWidth + indentPx
+                      : indentPx;
+
+                xValue = startX;
+                textAnchorValue = "start";
+                appendRuns(text, runs);
+              }
+
+              text.setAttribute("x", `${xValue}`);
+              text.setAttribute("y", `${yTop + verticalOffset}`);
+              text.setAttribute("font-family", getFontFamilyString(element));
+              text.setAttribute("font-size", `${lineFontSize}px`);
+              text.setAttribute("fill", element.strokeColor);
+              text.setAttribute("text-anchor", textAnchorValue);
+              text.setAttribute("style", "white-space: pre;");
+              text.setAttribute("direction", direction);
+              text.setAttribute("dominant-baseline", "alphabetic");
+              node.appendChild(text);
+
+              yTop += lineHeightPx;
+              continue;
+            }
+
+            const indentPx = block.indentEm * element.fontSize;
+            const availableWidth = Math.max(0, element.width - indentPx);
+            const layout = layoutMarkdownTable({
+              table: block.table,
+              baseFont: baseFontString as any,
+              fontSize: element.fontSize,
+              lineHeightPx,
+              maxWidth: availableWidth,
+              headerBold: true,
+            });
+
+            const xOffset =
+              element.textAlign === "center"
+                ? (availableWidth - layout.width) / 2
+                : element.textAlign === "right"
+                  ? availableWidth - layout.width
+                  : 0;
+            const tableX = Math.max(0, indentPx + xOffset);
+            const tableY = yTop;
+
+            if (layout.hasHeader) {
+              for (let c = 0; c < layout.colWidths.length; c++) {
+                const cellX =
+                  tableX +
+                  computeTableCellX(layout.colWidths, layout.borderWidth, c);
+                const cellY =
+                  tableY +
+                  computeTableCellY(layout.rowHeights, layout.borderWidth, 0);
+                const rect = svgRoot.ownerDocument!.createElementNS(SVG_NS, "rect");
+                rect.setAttribute("x", `${cellX}`);
+                rect.setAttribute("y", `${cellY}`);
+                rect.setAttribute("width", `${layout.colWidths[c]}`);
+                rect.setAttribute("height", `${layout.rowHeights[0]}`);
+                rect.setAttribute("fill", "rgba(0,0,0,0.06)");
+                rect.setAttribute("stroke", "none");
+                node.appendChild(rect);
+              }
+            }
+
+            const borderColor = "rgba(0,0,0,0.25)";
+            const borderWidth = `${layout.borderWidth}`;
+
+            const outer = svgRoot.ownerDocument!.createElementNS(SVG_NS, "rect");
+            outer.setAttribute("x", `${tableX}`);
+            outer.setAttribute("y", `${tableY}`);
+            outer.setAttribute("width", `${layout.width}`);
+            outer.setAttribute("height", `${layout.height}`);
+            outer.setAttribute("fill", "none");
+            outer.setAttribute("stroke", borderColor);
+            outer.setAttribute("stroke-width", borderWidth);
+            node.appendChild(outer);
+
+            let xLine = tableX + layout.borderWidth;
+            for (let c = 0; c < layout.colWidths.length - 1; c++) {
+              xLine += layout.colWidths[c] + layout.borderWidth;
+              const line = svgRoot.ownerDocument!.createElementNS(SVG_NS, "line");
+              line.setAttribute("x1", `${xLine}`);
+              line.setAttribute("y1", `${tableY}`);
+              line.setAttribute("x2", `${xLine}`);
+              line.setAttribute("y2", `${tableY + layout.height}`);
+              line.setAttribute("stroke", borderColor);
+              line.setAttribute("stroke-width", borderWidth);
+              node.appendChild(line);
+            }
+
+            let yLine = tableY + layout.borderWidth;
+            for (let r = 0; r < layout.rowHeights.length - 1; r++) {
+              yLine += layout.rowHeights[r] + layout.borderWidth;
+              const line = svgRoot.ownerDocument!.createElementNS(SVG_NS, "line");
+              line.setAttribute("x1", `${tableX}`);
+              line.setAttribute("y1", `${yLine}`);
+              line.setAttribute("x2", `${tableX + layout.width}`);
+              line.setAttribute("y2", `${yLine}`);
+              line.setAttribute("stroke", borderColor);
+              line.setAttribute("stroke-width", borderWidth);
+              node.appendChild(line);
+            }
+
+            for (let r = 0; r < layout.rowHeights.length; r++) {
+              for (let c = 0; c < layout.colWidths.length; c++) {
+                const cell = layout.cells[r][c];
+                const cellX =
+                  tableX +
+                  computeTableCellX(layout.colWidths, layout.borderWidth, c);
+                const cellY =
+                  tableY +
+                  computeTableCellY(layout.rowHeights, layout.borderWidth, r);
+                const cellWidth = layout.colWidths[c];
+                const align = block.table.alignments[c] ?? "left";
+
+                for (let li = 0; li < cell.runsByLine.length; li++) {
+                  const runs = cell.runsByLine[li];
+                  const textWidth = measureCellLineWidth(runs as any, baseFontString as any);
+                  const x = computeAlignedTextX({
+                    cellX,
+                    cellWidth,
+                    paddingX: layout.paddingX,
+                    align,
+                    textWidth,
+                  });
+
+                  const textEl = svgRoot.ownerDocument!.createElementNS(SVG_NS, "text");
+                  textEl.setAttribute("x", `${x}`);
+                  textEl.setAttribute(
+                    "y",
+                    `${cellY + layout.paddingY + verticalOffset + li * lineHeightPx}`,
+                  );
+                  textEl.setAttribute("font-family", getFontFamilyString(element));
+                  textEl.setAttribute("font-size", `${element.fontSize}px`);
+                  textEl.setAttribute("fill", element.strokeColor);
+                  textEl.setAttribute("text-anchor", "start");
+                  textEl.setAttribute("style", "white-space: pre;");
+                  textEl.setAttribute("direction", direction);
+                  textEl.setAttribute("dominant-baseline", "alphabetic");
+                  appendRuns(textEl, runs as any);
+                  node.appendChild(textEl);
+                }
+              }
+            }
+
+            yTop += layout.height + Math.round(lineHeightPx * 0.2);
+          }
         }
 
         const g = maybeWrapNodesInFrameClipPath(

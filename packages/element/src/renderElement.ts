@@ -19,7 +19,9 @@ import {
   THEME,
   distance,
   getFontString,
+  getStyledFontString,
   isRTL,
+  parseMarkdownToBlocks,
   getVerticalOffset,
   invariant,
 } from "@excalidraw/common";
@@ -76,10 +78,50 @@ import type {
   ExcalidrawFrameLikeElement,
   NonDeletedSceneElementsMap,
   ElementsMap,
+  FontString,
 } from "./types";
+
+import {
+  computeAlignedTextX,
+  computeTableCellX,
+  computeTableCellY,
+  layoutMarkdownTable,
+  measureCellLineWidth,
+} from "./markdownTable";
 
 import type { StrokeOptions } from "perfect-freehand";
 import type { RoughCanvas } from "roughjs/bin/canvas";
+
+const getHeadingScale = (headingLevel: number) => {
+  switch (headingLevel) {
+    case 1:
+      return 2;
+    case 2:
+      return 1.5;
+    case 3:
+      return 1.25;
+    case 4:
+      return 1;
+    case 5:
+      return 0.875;
+    case 6:
+      return 0.85;
+    default:
+      return 1;
+  }
+};
+
+const scaleFontString = (font: FontString, scale: number): FontString => {
+  if (scale === 1) {
+    return font;
+  }
+  const fontSize = parseFloat(font);
+  if (!Number.isFinite(fontSize) || fontSize <= 0) {
+    return font;
+  }
+  const nextSize = fontSize * scale;
+  return font.replace(/^(\d+(?:\.\d+)?)px\s+/, `${nextSize}px `) as FontString;
+};
 
 // using a stronger invert (100% vs our regular 93%) and saturate
 // as a temp hack to make images in dark theme look closer to original
@@ -505,19 +547,15 @@ const drawElementOnCanvas = (
         }
         context.canvas.setAttribute("dir", rtl ? "rtl" : "ltr");
         context.save();
-        context.font = getFontString(element);
+        const baseFontString = getFontString(element);
+        context.font = baseFontString;
         context.fillStyle = element.strokeColor;
-        context.textAlign = element.textAlign as CanvasTextAlign;
+        context.textAlign = (rtl
+          ? (element.textAlign as CanvasTextAlign)
+          : "left") as CanvasTextAlign;
 
-        // Canvas does not support multiline text by default
-        const lines = element.text.replace(/\r\n?/g, "\n").split("\n");
-
-        const horizontalOffset =
-          element.textAlign === "center"
-            ? element.width / 2
-            : element.textAlign === "right"
-            ? element.width
-            : 0;
+        const rawLines = element.text.replace(/\r\n?/g, "\n").split("\n");
+        const blocks = rtl ? null : parseMarkdownToBlocks(element.text);
 
         const lineHeightPx = getLineHeightInPx(
           element.fontSize,
@@ -530,12 +568,236 @@ const drawElementOnCanvas = (
           lineHeightPx,
         );
 
-        for (let index = 0; index < lines.length; index++) {
-          context.fillText(
-            lines[index],
-            horizontalOffset,
-            index * lineHeightPx + verticalOffset,
-          );
+        if (rtl) {
+          for (let index = 0; index < rawLines.length; index++) {
+            const y = index * lineHeightPx + verticalOffset;
+            const horizontalOffset =
+              element.textAlign === "center"
+                ? element.width / 2
+                : element.textAlign === "right"
+                  ? element.width
+                  : 0;
+            context.fillText(rawLines[index] ?? "", horizontalOffset, y);
+          }
+        } else {
+          let yTop = 0;
+          for (const block of blocks!) {
+            if (block.type === "line") {
+              const line = block.line;
+              const runs = line.runs;
+              const headingScale = getHeadingScale(line.headingLevel);
+              const lineFontSize = element.fontSize * headingScale;
+              const lineHeightPx = getLineHeightInPx(
+                lineFontSize,
+                element.lineHeight,
+              );
+              const verticalOffset = getVerticalOffset(
+                element.fontFamily,
+                lineFontSize,
+                lineHeightPx,
+              );
+              const y = yTop + verticalOffset;
+              const lineBaseFontString = scaleFontString(
+                baseFontString as FontString,
+                headingScale,
+              );
+              const indentPx = line.indentEm * element.fontSize;
+              let renderedLineWidth = 0;
+              for (const run of runs) {
+                if (!run.text) {
+                  continue;
+                }
+                const styledFontString = getStyledFontString(
+                  lineBaseFontString,
+                  run,
+                ) as FontString;
+                context.font = styledFontString;
+                renderedLineWidth += context.measureText(run.text).width;
+              }
+
+              renderedLineWidth += indentPx;
+
+              const startX =
+                element.textAlign === "center"
+                  ? element.width / 2 - renderedLineWidth / 2 + indentPx
+                  : element.textAlign === "right"
+                    ? element.width - renderedLineWidth + indentPx
+                    : indentPx;
+
+              let x = startX;
+              for (const run of runs) {
+                if (!run.text) {
+                  continue;
+                }
+                const styledFontString = getStyledFontString(
+                  lineBaseFontString,
+                  run,
+                ) as FontString;
+                context.font = styledFontString;
+                context.fillStyle = run.link ? "#0b5fff" : element.strokeColor;
+                context.fillText(run.text, x, y);
+                const runWidth = context.measureText(run.text).width;
+                if (run.strikethrough || run.underline) {
+                  context.save();
+                  context.strokeStyle = run.link ? "#0b5fff" : element.strokeColor;
+                  context.lineWidth = 1;
+                  context.beginPath();
+                  if (run.strikethrough) {
+                    const strikeY = y - lineFontSize * 0.3;
+                    context.moveTo(x, strikeY);
+                    context.lineTo(x + runWidth, strikeY);
+                  }
+                  if (run.underline) {
+                    const underlineY = y + lineFontSize * 0.1;
+                    context.moveTo(x, underlineY);
+                    context.lineTo(x + runWidth, underlineY);
+                  }
+                  context.stroke();
+                  context.restore();
+                }
+                x += runWidth;
+              }
+
+              yTop += lineHeightPx;
+              continue;
+            }
+
+            const indentPx = block.indentEm * element.fontSize;
+            const availableWidth = Math.max(0, element.width - indentPx);
+            const layout = layoutMarkdownTable({
+              table: block.table,
+              baseFont: baseFontString as FontString,
+              fontSize: element.fontSize,
+              lineHeightPx,
+              maxWidth: availableWidth,
+              headerBold: true,
+            });
+
+            const xOffset =
+              element.textAlign === "center"
+                ? (availableWidth - layout.width) / 2
+                : element.textAlign === "right"
+                  ? availableWidth - layout.width
+                  : 0;
+            const tableX = Math.max(0, indentPx + xOffset);
+            const tableY = yTop;
+
+            if (layout.hasHeader) {
+              context.save();
+              context.globalAlpha *= 0.06;
+              context.fillStyle = "#000000";
+              for (let c = 0; c < layout.colWidths.length; c++) {
+                const cellX =
+                  tableX +
+                  computeTableCellX(layout.colWidths, layout.borderWidth, c);
+                const cellY =
+                  tableY +
+                  computeTableCellY(layout.rowHeights, layout.borderWidth, 0);
+                context.fillRect(
+                  cellX,
+                  cellY,
+                  layout.colWidths[c],
+                  layout.rowHeights[0],
+                );
+              }
+              context.restore();
+            }
+
+            context.save();
+            context.globalAlpha *= 0.25;
+            context.strokeStyle = element.strokeColor;
+            context.lineWidth = layout.borderWidth;
+            context.beginPath();
+            let xCursor = tableX;
+            context.moveTo(xCursor, tableY);
+            context.lineTo(xCursor + layout.width, tableY);
+            context.lineTo(xCursor + layout.width, tableY + layout.height);
+            context.lineTo(xCursor, tableY + layout.height);
+            context.closePath();
+
+            let xLine = tableX + layout.borderWidth;
+            for (let c = 0; c < layout.colWidths.length - 1; c++) {
+              xLine += layout.colWidths[c] + layout.borderWidth;
+              context.moveTo(xLine, tableY);
+              context.lineTo(xLine, tableY + layout.height);
+            }
+
+            let yLine = tableY + layout.borderWidth;
+            for (let r = 0; r < layout.rowHeights.length - 1; r++) {
+              yLine += layout.rowHeights[r] + layout.borderWidth;
+              context.moveTo(tableX, yLine);
+              context.lineTo(tableX + layout.width, yLine);
+            }
+
+            context.stroke();
+            context.restore();
+
+            for (let r = 0; r < layout.rowHeights.length; r++) {
+              for (let c = 0; c < layout.colWidths.length; c++) {
+                const cell = layout.cells[r][c];
+                const cellX =
+                  tableX +
+                  computeTableCellX(layout.colWidths, layout.borderWidth, c);
+                const cellY =
+                  tableY +
+                  computeTableCellY(layout.rowHeights, layout.borderWidth, r);
+                const cellWidth = layout.colWidths[c];
+
+                for (let li = 0; li < cell.runsByLine.length; li++) {
+                  const runs = cell.runsByLine[li];
+                  const textWidth = measureCellLineWidth(
+                    runs,
+                    baseFontString as FontString,
+                  );
+                  const align = block.table.alignments[c] ?? "left";
+                  const textX = computeAlignedTextX({
+                    cellX,
+                    cellWidth,
+                    paddingX: layout.paddingX,
+                    align,
+                    textWidth,
+                  });
+                  const y = cellY + layout.paddingY + verticalOffset + li * lineHeightPx;
+
+                  let x = textX;
+                  for (const run of runs) {
+                    if (!run.text) {
+                      continue;
+                    }
+                    const styledFontString = getStyledFontString(
+                      baseFontString,
+                      run,
+                    ) as FontString;
+                    context.font = styledFontString;
+                    context.fillStyle = run.link ? "#0b5fff" : element.strokeColor;
+                    context.fillText(run.text, x, y);
+                    const runWidth = context.measureText(run.text).width;
+                    if (run.strikethrough || run.underline) {
+                      context.save();
+                      context.strokeStyle = run.link ? "#0b5fff" : element.strokeColor;
+                      context.lineWidth = 1;
+                      context.beginPath();
+                      if (run.strikethrough) {
+                        const strikeY = y - element.fontSize * 0.3;
+                        context.moveTo(x, strikeY);
+                        context.lineTo(x + runWidth, strikeY);
+                      }
+                      if (run.underline) {
+                        const underlineY = y + element.fontSize * 0.1;
+                        context.moveTo(x, underlineY);
+                        context.lineTo(x + runWidth, underlineY);
+                      }
+                      context.stroke();
+                      context.restore();
+                    }
+                    x += runWidth;
+                  }
+                }
+              }
+            }
+
+            yTop += layout.height + Math.round(lineHeightPx * 0.2);
+          }
         }
         context.restore();
         if (shouldTemporarilyAttach) {

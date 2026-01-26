@@ -106,6 +106,70 @@ describe("exportToSvg", () => {
     );
   });
 
+  it("renders markdown runs as tspans", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      [
+        {
+          ...textFixture,
+          height: ELEMENT_HEIGHT,
+          width: ELEMENT_WIDTH,
+          text: "a **b** c",
+          originalText: "a **b** c",
+          index: "am0" as FractionalIndex,
+        } as ExcalidrawTextElement,
+      ],
+      DEFAULT_OPTIONS,
+      null,
+    );
+
+    const boldTspan = svgElement.querySelector('tspan[font-weight="bold"]');
+    expect(boldTspan?.textContent).toBe("b");
+  });
+
+  it("renders markdown headings with larger font-size", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      [
+        {
+          ...textFixture,
+          height: ELEMENT_HEIGHT,
+          width: ELEMENT_WIDTH,
+          text: "# Title",
+          originalText: "# Title",
+          index: "am0" as FractionalIndex,
+        } as ExcalidrawTextElement,
+      ],
+      DEFAULT_OPTIONS,
+      null,
+    );
+
+    const headingText = svgElement.querySelector('text[font-size="40px"]');
+    expect(headingText?.textContent).toContain("Title");
+  });
+
+  it("renders markdown tables as grid", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      [
+        {
+          ...textFixture,
+          height: ELEMENT_HEIGHT,
+          width: ELEMENT_WIDTH,
+          text: `| A | B |\n| --- | --- |\n| long long long long | x |`,
+          originalText: `| A | B |\n| --- | --- |\n| long long long long | x |`,
+          index: "am0" as FractionalIndex,
+        } as ExcalidrawTextElement,
+      ],
+      DEFAULT_OPTIONS,
+      null,
+    );
+
+    const headerBg = svgElement.querySelector('rect[fill="rgba(0,0,0,0.06)"]');
+    const outerBorder = svgElement.querySelector(
+      'rect[stroke="rgba(0,0,0,0.25)"]',
+    );
+    expect(headerBg).not.toBeNull();
+    expect(outerBorder).not.toBeNull();
+  });
+
   it("with dark mode", async () => {
     const svgElement = await exportUtils.exportToSvg(
       ELEMENTS,

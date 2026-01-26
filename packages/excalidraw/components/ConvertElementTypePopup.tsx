@@ -380,6 +380,7 @@ export const adjustBoundTextSize = (
     wrappedText,
     getFontString(boundText),
     boundText.lineHeight,
+    maxWidth,
   );
 
   let nextFontSize = boundText.fontSize;
@@ -396,6 +397,7 @@ export const adjustBoundTextSize = (
       boundText.text,
       getFontString(_updatedTextElement),
       boundText.lineHeight,
+      maxWidth,
     );
   }
 

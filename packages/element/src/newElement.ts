@@ -294,6 +294,7 @@ const getAdjustedDimensions = (
   element: ExcalidrawTextElement,
   elementsMap: ElementsMap,
   nextText: string,
+  maxWidth: number | null = null,
 ): {
   x: number;
   y: number;
@@ -304,6 +305,7 @@ const getAdjustedDimensions = (
     nextText,
     getFontString(element),
     element.lineHeight,
+    maxWidth,
   );
 
   // wrapped text
@@ -426,16 +428,14 @@ export const refreshTextDimensions = (
   if (textElement.isDeleted) {
     return;
   }
+  let maxWidth: number | null = null;
   if (container || !textElement.autoResize) {
-    text = wrapText(
-      text,
-      getFontString(textElement),
-      container
-        ? getBoundTextMaxWidth(container, textElement)
-        : textElement.width,
-    );
+    maxWidth = container
+      ? getBoundTextMaxWidth(container, textElement)
+      : textElement.width;
+    text = wrapText(text, getFontString(textElement), maxWidth);
   }
-  const dimensions = getAdjustedDimensions(textElement, elementsMap, text);
+  const dimensions = getAdjustedDimensions(textElement, elementsMap, text, maxWidth);
   return { text, ...dimensions };
 };
 

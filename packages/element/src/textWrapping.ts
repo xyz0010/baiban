@@ -386,7 +386,88 @@ export const wrapText = (
   const lines: Array<string> = [];
   const originalLines = text.split("\n");
 
-  for (const originalLine of originalLines) {
+  const splitTableRow = (row: string): string[] | null => {
+    let s = row.trim();
+    if (!s.includes("|")) {
+      return null;
+    }
+    if (s.startsWith("|")) {
+      s = s.slice(1);
+    }
+    if (s.endsWith("|")) {
+      s = s.slice(0, -1);
+    }
+    const cells: string[] = [];
+    let current = "";
+    let escaped = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (escaped) {
+        current += ch;
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === "|") {
+        cells.push(current.trim());
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    cells.push(current.trim());
+    return cells;
+  };
+
+  const isAlignmentRow = (row: string) => {
+    const cells = splitTableRow(row);
+    if (!cells) {
+      return false;
+    }
+    return cells.every((cell) => /^:?-{1,}:?$/.test(cell.replace(/\s+/g, "")));
+  };
+
+  for (let i = 0; i < originalLines.length; i++) {
+    const originalLine = originalLines[i];
+    const trimmed = originalLine.trimStart();
+
+    if (trimmed.startsWith("<table")) {
+      lines.push(originalLine);
+      i++;
+      while (i < originalLines.length) {
+        lines.push(originalLines[i]);
+        if (originalLines[i].includes("</table>")) {
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    const headerCells = splitTableRow(originalLine);
+    if (
+      headerCells &&
+      i + 1 < originalLines.length &&
+      isAlignmentRow(originalLines[i + 1])
+    ) {
+      lines.push(originalLine);
+      lines.push(originalLines[i + 1]);
+      i += 2;
+      while (i < originalLines.length) {
+        const rowCells = splitTableRow(originalLines[i]);
+        if (!rowCells || rowCells.length !== headerCells.length) {
+          i -= 1;
+          break;
+        }
+        lines.push(originalLines[i]);
+        i++;
+      }
+      continue;
+    }
+
     const currentLineWidth = getLineWidth(originalLine, font);
 
     if (currentLineWidth <= maxWidth) {
