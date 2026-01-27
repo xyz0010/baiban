@@ -348,6 +348,12 @@ export interface AppState {
   currentItemStrokeStyle: ExcalidrawElement["strokeStyle"];
   currentItemRoughness: number;
   currentItemOpacity: number;
+  freedrawHighlighterEnabled: boolean;
+  freedrawPenStyle: {
+    strokeColor: string;
+    strokeWidth: number;
+    opacity: number;
+  } | null;
   currentItemFontFamily: FontFamilyValues;
   currentItemFontSize: number;
   currentItemTextAlign: TextAlign;

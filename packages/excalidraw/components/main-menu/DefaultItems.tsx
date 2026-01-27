@@ -11,6 +11,7 @@ import {
   actionToggleTheme,
   actionExportToPdf,
   actionExportToOfflineHTML,
+  actionExportToObsidianMarkdownZip,
 } from "../../actions";
 import { getShortcutFromShortcutName } from "../../actions/shortcuts";
 import { trackEvent } from "../../analytics";
@@ -379,6 +380,28 @@ export const ExportToOfflineHTML = () => {
   );
 };
 ExportToOfflineHTML.displayName = "ExportToOfflineHTML";
+
+export const ExportToObsidianMarkdownZip = () => {
+  const actionManager = useExcalidrawActionManager();
+
+  if (!actionManager.isActionEnabled(actionExportToObsidianMarkdownZip)) {
+    return null;
+  }
+
+  return (
+    <DropdownMenuItem
+      icon={ExportIcon}
+      onSelect={() =>
+        actionManager.executeAction(actionExportToObsidianMarkdownZip)
+      }
+      data-testid="obsidian-md-export-button"
+      aria-label="导出为MD格式(zip)"
+    >
+      导出为MD格式(zip)
+    </DropdownMenuItem>
+  );
+};
+ExportToObsidianMarkdownZip.displayName = "ExportToObsidianMarkdownZip";
 
 export const Socials = () => {
   const { t } = useI18n();

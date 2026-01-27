@@ -8672,7 +8672,35 @@ class App extends React.Component<AppProps, AppState> {
       pressures: simulatePressure ? [] : [event.pressure],
     });
 
-    this.scene.insertElement(element);
+    if (this.state.freedrawHighlighterEnabled) {
+      const elements = this.scene.getElementsIncludingDeleted();
+      const frameId = element.frameId;
+      if (frameId) {
+        const frameIndex = this.scene.getElementIndex(frameId);
+        const firstTextInFrameIndex = elements.findIndex(
+          (el, idx) =>
+            idx >= 0 &&
+            idx < frameIndex &&
+            !el.isDeleted &&
+            el.type === "text" &&
+            el.frameId === frameId,
+        );
+        this.scene.insertElementAtIndex(
+          element,
+          firstTextInFrameIndex > -1 ? firstTextInFrameIndex : frameIndex,
+        );
+      } else {
+        const firstTextIndex = elements.findIndex(
+          (el) => !el.isDeleted && el.type === "text" && el.frameId == null,
+        );
+        this.scene.insertElementAtIndex(
+          element,
+          firstTextIndex > -1 ? firstTextIndex : elements.length,
+        );
+      }
+    } else {
+      this.scene.insertElement(element);
+    }
 
     this.setState((prevState) => {
       const nextSelectedElementIds = {

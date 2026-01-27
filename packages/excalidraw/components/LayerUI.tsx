@@ -115,6 +115,7 @@ const DefaultMainMenu: React.FC<{
         <MainMenu.DefaultItems.SaveAsImage />
       )}
       <MainMenu.DefaultItems.ExportToPdf />
+      <MainMenu.DefaultItems.ExportToObsidianMarkdownZip />
       <MainMenu.DefaultItems.ExportToOfflineHTML />
       <MainMenu.DefaultItems.SearchMenu />
       <MainMenu.DefaultItems.Help />

@@ -86,6 +86,7 @@ import { ColorPicker } from "../components/ColorPicker/ColorPicker";
 import { FontPicker } from "../components/FontPicker/FontPicker";
 import { IconPicker } from "../components/IconPicker";
 import { Range } from "../components/Range";
+import { ToolButton } from "../components/ToolButton";
 import {
   ArrowheadArrowIcon,
   ArrowheadBarIcon,
@@ -729,6 +730,94 @@ export const actionChangeOpacity = register<ExcalidrawElement["opacity"]>({
   PanelComponent: ({ app, updateData }) => (
     <Range updateData={updateData} app={app} testId="opacity" />
   ),
+});
+
+export const actionApplyHighlighterPreset = register<boolean>({
+  name: "applyHighlighterPreset",
+  label: "labels.highlighter",
+  trackEvent: false,
+  checked: (appState) => appState.freedrawHighlighterEnabled,
+  perform: (elements, appState, value) => {
+    const nextEnabled =
+      typeof value === "boolean"
+        ? value
+        : !appState.freedrawHighlighterEnabled;
+
+    const strokeColor = DEFAULT_ELEMENT_STROKE_PICKS[4];
+    const opacity = 35;
+    const strokeWidth = STROKE_WIDTH.extraBold;
+
+    const nextElements = elements.map((el) => {
+      if (
+        appState.selectedElementIds[el.id] &&
+        el.type === "freedraw" &&
+        el.hasOwnProperty("strokeColor") &&
+        el.hasOwnProperty("strokeWidth") &&
+        el.hasOwnProperty("opacity")
+      ) {
+        return newElementWith(el, { strokeColor, opacity, strokeWidth });
+      }
+      return el;
+    });
+
+    const baseAppState = {
+      ...appState,
+      freedrawHighlighterEnabled: nextEnabled,
+    };
+
+    if (nextEnabled) {
+      return {
+        elements: nextElements,
+        appState: {
+          ...baseAppState,
+          freedrawPenStyle: {
+            strokeColor: appState.currentItemStrokeColor,
+            opacity: appState.currentItemOpacity,
+            strokeWidth: appState.currentItemStrokeWidth,
+          },
+          currentItemStrokeColor: strokeColor,
+          currentItemOpacity: opacity,
+          currentItemStrokeWidth: strokeWidth,
+        },
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      };
+    }
+
+    const restored = appState.freedrawPenStyle;
+    return {
+      elements: nextElements,
+      appState: {
+        ...baseAppState,
+        ...(restored
+          ? {
+              currentItemStrokeColor: restored.strokeColor,
+              currentItemOpacity: restored.opacity,
+              currentItemStrokeWidth: restored.strokeWidth,
+            }
+          : null),
+      },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    };
+  },
+  PanelComponent: ({ updateData, appState }) => {
+    return (
+      <fieldset>
+        <legend>{t("labels.highlighter")}</legend>
+        <div className="buttonList">
+          <ToolButton
+            type="icon"
+            icon={StrokeWidthExtraBoldIcon}
+            aria-label={t("labels.highlighter")}
+            data-testid="apply-highlighter-preset"
+            title={t("labels.highlighter")}
+            size="small"
+            selected={appState.freedrawHighlighterEnabled}
+            onClick={() => updateData(!appState.freedrawHighlighterEnabled)}
+          />
+        </div>
+      </fieldset>
+    );
+  },
 });
 
 export const actionChangeFontSize = register<ExcalidrawTextElement["fontSize"]>(

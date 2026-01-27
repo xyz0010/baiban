@@ -13,6 +13,7 @@ export * from "./actionElementLock";
 export * from "./actionEmbeddable";
 export * from "./actionExport";
 export * from "./actionExportToOfflineHTML";
+export * from "./actionExportToObsidianMarkdownZip";
 export * from "./actionExportToPdf";
 export * from "./actionExportWithDarkMode";
 export * from "./actionFinalize";

@@ -44,6 +44,7 @@ export type ActionFilterFn = (action: Action) => void;
 
 export type ActionName =
   | "exportVideo"
+  | "exportToObsidianMarkdownZip"
   | "copy"
   | "cut"
   | "paste"
@@ -73,6 +74,7 @@ export type ActionName =
   | "changeArrowType"
   | "changeArrowProperties"
   | "changeOpacity"
+  | "applyHighlighterPreset"
   | "changeFontSize"
   | "undo"
   | "redo"

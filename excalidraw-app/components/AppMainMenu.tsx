@@ -26,6 +26,7 @@ export const AppMainMenu: React.FC<{
       <MainMenu.DefaultItems.Export />
       <MainMenu.DefaultItems.SaveAsImage />
       <MainMenu.DefaultItems.ExportToPdf />
+      <MainMenu.DefaultItems.ExportToObsidianMarkdownZip />
       <MainMenu.DefaultItems.ExportToOfflineHTML />
       <MainMenu.DefaultItems.CommandPalette className="highlighted" />
       <MainMenu.DefaultItems.SearchMenu />

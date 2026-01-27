@@ -1,8 +1,11 @@
 import { queryByTestId } from "@testing-library/react";
 
+import { pointFrom } from "@excalidraw/math";
+
 import {
   COLOR_PALETTE,
   DEFAULT_ELEMENT_BACKGROUND_PICKS,
+  DEFAULT_ELEMENT_STROKE_PICKS,
   FONT_FAMILY,
   STROKE_WIDTH,
 } from "@excalidraw/common";
@@ -10,7 +13,7 @@ import {
 import { Excalidraw } from "../index";
 import { API } from "../tests/helpers/api";
 import { UI } from "../tests/helpers/ui";
-import { render } from "../tests/test-utils";
+import { fireEvent, render, waitFor } from "../tests/test-utils";
 
 describe("element locking", () => {
   beforeEach(async () => {
@@ -79,6 +82,38 @@ describe("element locking", () => {
 
       const centerTextAlign = queryByTestId(document.body, `align-right`);
       expect(centerTextAlign).toBeChecked();
+    });
+
+    it("should toggle highlighter preset and restore previous freedraw style", async () => {
+      UI.clickTool("freedraw");
+
+      API.setAppState({
+        currentItemStrokeColor: COLOR_PALETTE.black,
+        currentItemOpacity: 100,
+        currentItemStrokeWidth: STROKE_WIDTH.thin,
+      });
+
+      const button = queryByTestId(document.body, "apply-highlighter-preset");
+      expect(button).not.toBe(null);
+      fireEvent.click(button as HTMLElement);
+
+      const { h } = window as any;
+      await waitFor(() => {
+        expect(h.state.currentItemStrokeColor).toBe(
+          DEFAULT_ELEMENT_STROKE_PICKS[4],
+        );
+      });
+      expect(h.state.currentItemOpacity).toBe(35);
+      expect(h.state.currentItemStrokeWidth).toBe(STROKE_WIDTH.extraBold);
+      expect(h.state.freedrawHighlighterEnabled).toBe(true);
+
+      fireEvent.click(button as HTMLElement);
+      await waitFor(() => {
+        expect(h.state.currentItemStrokeColor).toBe(COLOR_PALETTE.black);
+      });
+      expect(h.state.currentItemOpacity).toBe(100);
+      expect(h.state.currentItemStrokeWidth).toBe(STROKE_WIDTH.thin);
+      expect(h.state.freedrawHighlighterEnabled).toBe(false);
     });
   });
 
@@ -168,6 +203,30 @@ describe("element locking", () => {
       expect(queryByTestId(document.body, `font-family-code`)).toHaveClass(
         "active",
       );
+    });
+
+    it("should apply highlighter preset to selected freedraw elements", async () => {
+      const freedraw = API.createElement({
+        type: "freedraw",
+        strokeColor: COLOR_PALETTE.black,
+        strokeWidth: STROKE_WIDTH.thin,
+        opacity: 100,
+        points: [pointFrom(0, 0), pointFrom(10, 10)],
+      });
+      API.setElements([freedraw]);
+      API.setSelectedElements([freedraw]);
+
+      const button = queryByTestId(document.body, "apply-highlighter-preset");
+      expect(button).not.toBe(null);
+      fireEvent.click(button as HTMLElement);
+
+      await waitFor(() => {
+        const updated = API.getSelectedElement();
+        expect(updated.type).toBe("freedraw");
+        expect(updated.strokeColor).toBe(DEFAULT_ELEMENT_STROKE_PICKS[4]);
+        expect(updated.opacity).toBe(35);
+        expect(updated.strokeWidth).toBe(STROKE_WIDTH.extraBold);
+      });
     });
   });
 });
