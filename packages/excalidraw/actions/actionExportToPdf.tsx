@@ -26,10 +26,36 @@ export const actionExportToPdf = register({
       };
     }
 
-    // Sort frames: top-left to bottom-right
-    frames.sort((a, b) => {
+    const collator = new Intl.Collator(undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    const compareByPosition = (a: ExcalidrawFrameLikeElement, b: ExcalidrawFrameLikeElement) => {
       if (Math.abs(a.y - b.y) > 10) return a.y - b.y;
-      return a.x - b.x;
+      if (a.x !== b.x) return a.x - b.x;
+      return a.id.localeCompare(b.id);
+    };
+
+    const getNormalizedName = (frame: ExcalidrawFrameLikeElement) => {
+      const name = frame.name?.trim();
+      return name ? name : null;
+    };
+
+    frames.sort((a, b) => {
+      const aName = getNormalizedName(a);
+      const bName = getNormalizedName(b);
+
+      if (aName && bName) {
+        const byName = collator.compare(aName, bName);
+        return byName !== 0 ? byName : compareByPosition(a, b);
+      }
+
+      if (aName || bName) {
+        return aName ? -1 : 1;
+      }
+
+      return compareByPosition(a, b);
     });
 
     try {

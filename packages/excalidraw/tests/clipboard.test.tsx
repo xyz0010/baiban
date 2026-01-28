@@ -13,6 +13,7 @@ import { Excalidraw } from "../index";
 
 import { API } from "./helpers/api";
 import { mockMermaidToExcalidraw } from "./helpers/mocks";
+import { mockMultipleHTMLImageElements } from "./helpers/mocks";
 import { Pointer, Keyboard } from "./helpers/ui";
 import {
   render,
@@ -49,6 +50,16 @@ const sendPasteEvent = (text: string) => {
   document.dispatchEvent(clipboardEvent);
 };
 
+const sendPasteEventWithHTML = (html: string, text: string) => {
+  const clipboardEvent = createPasteEvent({
+    types: {
+      "text/plain": text,
+      "text/html": html,
+    },
+  });
+  document.dispatchEvent(clipboardEvent);
+};
+
 const pasteWithCtrlCmdShiftV = (text: string) => {
   Keyboard.withModifierKeys({ ctrl: true, shift: true }, () => {
     //triggering keydown with an empty clipboard
@@ -64,6 +75,13 @@ const pasteWithCtrlCmdV = (text: string) => {
     Keyboard.keyPress(KEYS.V);
     //triggering paste event with faked clipboard
     sendPasteEvent(text);
+  });
+};
+
+const pasteHTMLWithCtrlCmdV = (html: string, text: string) => {
+  Keyboard.withModifierKeys({ ctrl: true }, () => {
+    Keyboard.keyPress(KEYS.V);
+    sendPasteEventWithHTML(html, text);
   });
 };
 
@@ -121,10 +139,37 @@ describe("general paste behavior", () => {
   });
 });
 
+describe("paste mixed content (html)", () => {
+  it("should paste both text and external image even when fetching fails", async () => {
+    const OriginalImage = globalThis.Image;
+    mockMultipleHTMLImageElements([[160, 120]]);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch" as any)
+      .mockRejectedValue(new TypeError("failed"));
+
+    const html =
+      '<p>Hello</p><img src="https://example.com/a.png" /><p>World</p>';
+
+    pasteHTMLWithCtrlCmdV(html, "Hello\n\nWorld");
+
+    await waitFor(() => {
+      expect(h.elements.some((el) => el.type === "text")).toBe(true);
+      expect(h.elements.some((el) => el.type === "image")).toBe(true);
+      expect(h.state.errorMessage).toBeFalsy();
+    });
+
+    const image = h.elements.find((el) => el.type === "image") as any;
+    expect(h.app.files[image.fileId].dataURL).toBe("https://example.com/a.png");
+
+    fetchSpy.mockRestore();
+    vi.stubGlobal("Image", OriginalImage);
+  });
+});
+
 describe("paste text as single lines", () => {
   it("should create an element for each line when copying with Ctrl/Cmd+V", async () => {
     const text = "sajgfakfn\naaksfnknas\nakefnkasf";
-    pasteWithCtrlCmdV(text);
+    pasteWithCtrlCmdShiftV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(text.split("\n").length);
     });
@@ -132,7 +177,7 @@ describe("paste text as single lines", () => {
 
   it("should ignore empty lines when creating an element for each line", async () => {
     const text = "\n\nsajgfakfn\n\n\naaksfnknas\n\nakefnkasf\n\n\n";
-    pasteWithCtrlCmdV(text);
+    pasteWithCtrlCmdShiftV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(3);
     });
@@ -158,7 +203,7 @@ describe("paste text as single lines", () => {
       ) +
       10 / h.app.state.zoom.value;
     mouse.moveTo(100, 100);
-    pasteWithCtrlCmdV(text);
+    pasteWithCtrlCmdShiftV(text);
     await waitFor(async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const [fx, firstElY] = getElementBounds(h.elements[0], elementsMap);
@@ -180,7 +225,7 @@ describe("paste text as single lines", () => {
       ) +
       10 / h.app.state.zoom.value;
     mouse.moveTo(100, 100);
-    pasteWithCtrlCmdV(text);
+    pasteWithCtrlCmdShiftV(text);
 
     await waitFor(async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -195,14 +240,14 @@ describe("paste text as single lines", () => {
 describe("paste text as a single element", () => {
   it("should create single text element when copying text with Ctrl/Cmd+Shift+V", async () => {
     const text = "sajgfakfn\naaksfnknas\nakefnkasf";
-    pasteWithCtrlCmdShiftV(text);
+    pasteWithCtrlCmdV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(1);
     });
   });
   it("should not create any element when only new lines in clipboard", async () => {
     const text = "\n\n\n\n";
-    pasteWithCtrlCmdShiftV(text);
+    pasteWithCtrlCmdV(text);
     await waitFor(async () => {
       await sleep(50);
       expect(h.elements.length).toEqual(0);
@@ -549,11 +594,10 @@ describe("clipboard - pasting mermaid definition", () => {
     const text = "flowchart TD xx\nA";
     pasteWithCtrlCmdV(text);
     await waitFor(() => {
-      expect(h.elements.length).toEqual(2);
+      expect(h.elements.length).toEqual(1);
       expect(h.elements).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ type: "text", text: "flowchart TD xx" }),
-          expect.objectContaining({ type: "text", text: "A" }),
+          expect.objectContaining({ type: "text", text: "flowchart TD xx\nA" }),
         ]),
       );
     });

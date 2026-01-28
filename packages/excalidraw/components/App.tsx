@@ -321,6 +321,7 @@ import {
   actionToggleCropEditor,
   actionSendToFlomo,
   actionExportToOfflineHTML,
+  actionExportToObsidianMarkdownZipInFrame,
   actionBreakApartText,
 } from "../actions";
 import { actionWrapTextInContainer } from "../actions/actionBoundText";
@@ -472,6 +473,7 @@ import type {
   AppProps,
   AppState,
   BinaryFileData,
+  DataURL,
   ExcalidrawImperativeAPI,
   BinaryFiles,
   Gesture,
@@ -3115,6 +3117,9 @@ class App extends React.Component<AppProps, AppState> {
         passive: false,
       }), // #3553
       addEventListener(document, EVENT.COPY, this.onCopy, { passive: false }),
+      addEventListener(document, EVENT.KEYDOWN, this.onSpaceKeyDown, {
+        passive: false,
+      }),
       addEventListener(document, EVENT.KEYUP, this.onKeyUp, { passive: true }),
       addEventListener(
         document,
@@ -3891,8 +3896,6 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
-  // TODO rewrite this to paste both text & images at the same time if
-  // pasted data contains both
   private async addElementsFromMixedContentPaste(
     mixedContent: PastedMixedContent,
     {
@@ -3901,48 +3904,244 @@ class App extends React.Component<AppProps, AppState> {
       sceneY,
     }: { isPlainPaste: boolean; sceneX: number; sceneY: number },
   ) {
-    if (
-      !isPlainPaste &&
-      mixedContent.some((node) => node.type === "imageUrl") &&
-      this.isToolSupported("image")
-    ) {
-      const imageURLs = mixedContent
-        .filter((node) => node.type === "imageUrl")
-        .map((node) => node.value);
-      const responses = await Promise.all(
-        imageURLs.map(async (url) => {
-          try {
-            return { file: await ImageURLToFile(url) };
-          } catch (error: any) {
-            let errorMessage = error.message;
-            if (error.cause === "FETCH_ERROR") {
-              errorMessage = t("errors.failedToFetchImage");
-            } else if (error.cause === "UNSUPPORTED") {
-              errorMessage = t("errors.unsupportedFileType");
-            }
-            return { errorMessage };
-          }
-        }),
-      );
+    const imageURLs = mixedContent
+      .filter((node) => node.type === "imageUrl")
+      .map((node) => node.value);
 
-      const imageFiles = responses
-        .filter((response): response is { file: File } => !!response.file)
-        .map((response) => response.file);
-      await this.insertImages(imageFiles, sceneX, sceneY);
-      const error = responses.find((response) => !!response.errorMessage);
-      if (error && error.errorMessage) {
-        this.setState({ errorMessage: error.errorMessage });
-      }
-    } else {
-      const textNodes = mixedContent.filter((node) => node.type === "text");
-      if (textNodes.length) {
-        this.addTextFromPaste(
-          textNodes.map((node) => node.value).join("\n\n"),
-          isPlainPaste,
-        );
+    const textNodes = mixedContent.filter((node) => node.type === "text");
+    const text = textNodes.map((node) => node.value).join("\n\n");
+
+    let imageInsertSceneY = sceneY;
+
+    if (text.trim().length) {
+      const before = new Set(
+        this.scene.getNonDeletedElements().map((element) => element.id),
+      );
+      const viewportCoords = sceneCoordsToViewportCoords(
+        { sceneX, sceneY },
+        this.state,
+      );
+      this.addTextFromPaste(text, isPlainPaste, {
+        clientX: viewportCoords.x,
+        clientY: viewportCoords.y,
+      });
+
+      const insertedTextElements = this.scene
+        .getNonDeletedElements()
+        .filter((element) => !before.has(element.id) && element.type === "text");
+
+      if (insertedTextElements.length) {
+        imageInsertSceneY =
+          Math.max(
+            ...insertedTextElements.map(
+              (element) => element.y + element.height,
+            ),
+          ) +
+          30 / this.state.zoom.value;
       }
     }
+
+    if (isPlainPaste || imageURLs.length === 0) {
+      return;
+    }
+
+    if (!this.isToolSupported("image")) {
+      this.setState({ errorMessage: t("errors.imageToolNotSupported") });
+      return;
+    }
+
+    const responses = await Promise.all(
+      imageURLs.map(async (url) => {
+        try {
+          return { file: await ImageURLToFile(url) };
+        } catch (error: any) {
+          return { error, url };
+        }
+      }),
+    );
+
+    const imageFiles = responses
+      .filter((response): response is { file: File } => !!(response as any).file)
+      .map((response: any) => response.file as File);
+
+    const fallbackURLs = responses
+      .filter(
+        (response): response is { error: any; url: string } =>
+          !!(response as any).error &&
+          (response as any).error?.cause === "FETCH_ERROR",
+      )
+      .map((response: any) => response.url as string);
+
+    const unsupportedError = responses.find(
+      (response: any) => response.error?.cause === "UNSUPPORTED",
+    ) as any as { error: any } | undefined;
+
+    if (imageFiles.length) {
+      await this.insertImages(imageFiles, sceneX, imageInsertSceneY);
+    }
+    if (fallbackURLs.length) {
+      await this.insertImageURLs(fallbackURLs, sceneX, imageInsertSceneY);
+    }
+    if (unsupportedError?.error) {
+      this.setState({ errorMessage: t("errors.unsupportedFileType") });
+    }
   }
+
+  private getImageMimeTypeFromURL = (url: string) => {
+    const normalizedURL = url.split("#")[0].split("?")[0].toLowerCase();
+    if (normalizedURL.endsWith(".png")) {
+      return MIME_TYPES.png;
+    }
+    if (normalizedURL.endsWith(".jpg") || normalizedURL.endsWith(".jpeg")) {
+      return MIME_TYPES.jpg;
+    }
+    if (normalizedURL.endsWith(".gif")) {
+      return MIME_TYPES.gif;
+    }
+    if (normalizedURL.endsWith(".webp")) {
+      return MIME_TYPES.webp;
+    }
+    if (normalizedURL.endsWith(".svg")) {
+      return MIME_TYPES.svg;
+    }
+    return null;
+  };
+
+  private getFileNameFromURL = (url: string) => {
+    try {
+      const u = new URL(url);
+      const candidate = u.pathname.split("/").pop();
+      return candidate ? decodeURIComponent(candidate) : "";
+    } catch {
+      return "";
+    }
+  };
+
+  private initializeImageURL = async (
+    placeholderImageElement: ExcalidrawImageElement,
+    imageUrl: string,
+  ) => {
+    setCursor(this.interactiveCanvas, "wait");
+
+    const fileId = nanoid(40) as FileId;
+    const mimeType = this.getImageMimeTypeFromURL(imageUrl) || MIME_TYPES.jpg;
+    const name = this.getFileNameFromURL(imageUrl);
+    const dataURL = imageUrl as DataURL;
+
+    return new Promise<NonDeleted<InitializedExcalidrawImageElement>>(
+      async (resolve, reject) => {
+        try {
+          let initializedImageElement = this.getLatestInitializedImageElement(
+            placeholderImageElement,
+            fileId,
+          );
+
+          this.addMissingFiles([
+            {
+              mimeType,
+              id: fileId,
+              dataURL,
+              name,
+              created: Date.now(),
+              lastRetrieved: Date.now(),
+            },
+          ]);
+
+          if (!this.imageCache.get(fileId)) {
+            this.addNewImagesToImageCache();
+
+            const { erroredFiles } = await this.updateImageCache([
+              initializedImageElement,
+            ]);
+
+            if (erroredFiles.size) {
+              throw new Error("Image cache update resulted with an error.");
+            }
+          }
+
+          const imageHTML = await this.imageCache.get(fileId)?.image;
+
+          if (
+            imageHTML &&
+            this.state.newElement?.id !== initializedImageElement.id
+          ) {
+            initializedImageElement = this.getLatestInitializedImageElement(
+              placeholderImageElement,
+              fileId,
+            );
+
+            const naturalDimensions = this.getImageNaturalDimensions(
+              initializedImageElement,
+              imageHTML,
+            );
+
+            Object.assign(initializedImageElement, naturalDimensions);
+          }
+
+          resolve(initializedImageElement);
+        } catch (error: any) {
+          console.error(error);
+          reject(new Error(t("errors.imageInsertError")));
+        }
+      },
+    );
+  };
+
+  private insertImageURLs = async (
+    imageURLs: string[],
+    sceneX: number,
+    sceneY: number,
+  ) => {
+    const gridPadding = 50 / this.state.zoom.value;
+    const placeholders = positionElementsOnGrid(
+      imageURLs.map(() => this.newImagePlaceholder({ sceneX, sceneY })),
+      sceneX,
+      sceneY,
+      gridPadding,
+    );
+    placeholders.forEach((el) => this.scene.insertElement(el));
+
+    const initialized = await Promise.all(
+      placeholders.map(async (placeholder, i) => {
+        try {
+          return await this.initializeImageURL(placeholder, imageURLs[i]);
+        } catch (error: any) {
+          this.setState({
+            errorMessage: error.message || t("errors.imageInsertError"),
+          });
+          return newElementWith(placeholder, { isDeleted: true });
+        }
+      }),
+    );
+    const initializedMap = arrayToMap(initialized);
+
+    const positioned = positionElementsOnGrid(
+      initialized.filter((el) => !el.isDeleted),
+      sceneX,
+      sceneY,
+      gridPadding,
+    );
+    const positionedMap = arrayToMap(positioned);
+
+    const nextElements = this.scene
+      .getElementsIncludingDeleted()
+      .map((el) => positionedMap.get(el.id) ?? initializedMap.get(el.id) ?? el);
+
+    this.updateScene({
+      appState: {
+        selectedElementIds: makeNextSelectedElementIds(
+          Object.fromEntries(positioned.map((el) => [el.id, true])),
+          this.state,
+        ),
+      },
+      elements: nextElements,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+
+    this.setState({}, () => {
+      this.actionManager.executeAction(actionFinalize);
+    });
+  };
 
   private addTextFromPaste(
     text: string,
@@ -4651,26 +4850,65 @@ class App extends React.Component<AppProps, AppState> {
       nextIndex = sortedFrames.length - 1;
     }
 
+    if (nextIndex === currentFrameIndex) {
+      return;
+    }
+
     const nextFrame = sortedFrames[nextIndex];
     const scaleX = this.state.width / nextFrame.width;
     const scaleY = this.state.height / nextFrame.height;
     const zoomValue = Math.min(scaleX, scaleY);
 
-    this.setState({
-      scrollX:
-        this.state.width / 2 / zoomValue - (nextFrame.x + nextFrame.width / 2),
-      scrollY:
-        this.state.height / 2 / zoomValue -
-        (nextFrame.y + nextFrame.height / 2),
-      zoom: { value: zoomValue as any },
+    const targetScrollX =
+      this.state.width / 2 / zoomValue - (nextFrame.x + nextFrame.width / 2);
+    const targetScrollY =
+      this.state.height / 2 / zoomValue - (nextFrame.y + nextFrame.height / 2);
+
+    this.cancelInProgressAnimation?.();
+
+    const cancel = easeToValuesRAF({
+      fromValues: {
+        scrollX: this.state.scrollX,
+        scrollY: this.state.scrollY,
+        zoom: this.state.zoom.value,
+      },
+      toValues: { scrollX: targetScrollX, scrollY: targetScrollY, zoom: zoomValue },
+      interpolateValue: (from, to, progress, key) => {
+        if (key === "zoom") {
+          return from * Math.pow(to / from, easeOut(progress));
+        }
+        return undefined;
+      },
+      onStep: ({ scrollX, scrollY, zoom }) => {
+        this.setState({
+          scrollX,
+          scrollY,
+          zoom: { value: zoom as any },
+        });
+      },
+      onStart: () => {
+        this.setState({ shouldCacheIgnoreZoom: true });
+      },
+      onEnd: () => {
+        this.setState({ shouldCacheIgnoreZoom: false });
+      },
+      onCancel: () => {
+        this.setState({ shouldCacheIgnoreZoom: false });
+      },
+      duration: 500,
     });
+
+    this.cancelInProgressAnimation = () => {
+      cancel();
+      this.cancelInProgressAnimation = null;
+    };
   };
 
   // Input handling
   private onKeyDown = withBatchedUpdates(
     (event: React.KeyboardEvent | KeyboardEvent) => {
       if (this.state.presentationModeEnabled) {
-        if (event.key === KEYS.ARROW_RIGHT || event.key === KEYS.SPACE) {
+        if (event.key === KEYS.ARROW_RIGHT) {
           event.preventDefault();
           this.navigatePresentation(1);
           return;
@@ -5237,6 +5475,18 @@ class App extends React.Component<AppProps, AppState> {
 
   private onKeyUp = withBatchedUpdates((event: KeyboardEvent) => {
     if (event.key === KEYS.SPACE) {
+      isHoldingSpace = false;
+
+      if (this.state.presentationModeEnabled) {
+        const nextActiveTool = updateActiveTool(this.state, { type: "laser" });
+        this.setState({ activeTool: nextActiveTool });
+        setCursorForShape(this.interactiveCanvas, {
+          ...this.state,
+          activeTool: nextActiveTool,
+        });
+        return;
+      }
+
       if (
         this.state.viewModeEnabled ||
         this.state.openDialog?.name === "elementLinkSelector"
@@ -5253,7 +5503,6 @@ class App extends React.Component<AppProps, AppState> {
           activeEmbeddable: null,
         });
       }
-      isHoldingSpace = false;
     }
     if (
       (event.key === KEYS.ALT && this.state.bindMode === "skip") ||
@@ -5403,6 +5652,30 @@ class App extends React.Component<AppProps, AppState> {
         });
       }
     }
+  });
+
+  private onSpaceKeyDown = withBatchedUpdates((event: KeyboardEvent) => {
+    if (event.key !== KEYS.SPACE) {
+      return;
+    }
+
+    if (!this.state.presentationModeEnabled) {
+      return;
+    }
+
+    if (gesture.pointers.size !== 0 || isHoldingSpace) {
+      return;
+    }
+
+    if (isInputLike(event.target)) {
+      return;
+    }
+
+    isHoldingSpace = true;
+    const nextActiveTool = updateActiveTool(this.state, { type: "hand" });
+    this.setState({ activeTool: nextActiveTool });
+    setCursor(this.interactiveCanvas, CURSOR_TYPE.GRAB);
+    event.preventDefault();
   });
 
   // We purposely widen the `tool` type so this helper can be called with
@@ -8000,7 +8273,7 @@ class App extends React.Component<AppProps, AppState> {
         lastPointerUp = null;
         isPanning = false;
         if (!isHoldingSpace) {
-          if (this.state.viewModeEnabled) {
+          if (this.state.viewModeEnabled && !this.state.presentationModeEnabled) {
             setCursor(this.interactiveCanvas, CURSOR_TYPE.GRAB);
           } else {
             setCursorForShape(this.interactiveCanvas, this.state);
@@ -12616,14 +12889,20 @@ class App extends React.Component<AppProps, AppState> {
   private getContextMenuItems = (
     type: "canvas" | "element",
   ): ContextMenuItems => {
-    const options: ContextMenuItems = [];
-
-    options.push(
+    const exportOptions: ContextMenuItems = [
       actionCopyAsPng,
       actionExportPng,
       actionExportVideo,
       actionCopyAsSvg,
-    );
+    ];
+
+    const elementExportOptions: ContextMenuItems = [
+      actionCopyAsPng,
+      actionExportPng,
+      actionExportToObsidianMarkdownZipInFrame,
+      actionExportVideo,
+      actionCopyAsSvg,
+    ];
 
     // canvas contextMenu
     // -------------------------------------------------------------------------
@@ -12631,7 +12910,7 @@ class App extends React.Component<AppProps, AppState> {
     if (type === "canvas") {
       if (this.state.viewModeEnabled) {
         return [
-          ...options,
+          ...exportOptions,
           actionToggleGridMode,
           actionToggleZenMode,
           actionToggleViewMode,
@@ -12661,10 +12940,10 @@ class App extends React.Component<AppProps, AppState> {
     // element contextMenu
     // -------------------------------------------------------------------------
 
-    options.push(copyText);
+    elementExportOptions.push(copyText);
 
     if (this.state.viewModeEnabled) {
-      return [actionCopy, ...options];
+      return [actionCopy, ...elementExportOptions];
     }
 
     const zIndexActions: ContextMenuItems =
@@ -12690,7 +12969,7 @@ class App extends React.Component<AppProps, AppState> {
       CONTEXT_MENU_SEPARATOR,
       actionToggleCropEditor,
       CONTEXT_MENU_SEPARATOR,
-      ...options,
+      ...elementExportOptions,
       CONTEXT_MENU_SEPARATOR,
       actionCopyStyles,
       actionPasteStyles,

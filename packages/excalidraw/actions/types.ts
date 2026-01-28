@@ -45,6 +45,7 @@ export type ActionFilterFn = (action: Action) => void;
 export type ActionName =
   | "exportVideo"
   | "exportToObsidianMarkdownZip"
+  | "exportToObsidianMarkdownZipInFrame"
   | "copy"
   | "cut"
   | "paste"

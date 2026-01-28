@@ -10,6 +10,7 @@
     "copy": "Copy",
     "copyAsPng": "Copy to clipboard as PNG",
     "exportPng": "Export PNG",
+    "exportToObsidianMarkdownZipInFrame": "Export to Obsidian Markdown (zip)",
     "copyAsSvg": "Copy to clipboard as SVG",
     "copyText": "Copy to clipboard as text",
     "copySource": "Copy source to clipboard",
