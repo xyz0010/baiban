@@ -43,32 +43,10 @@ if errorlevel 1 (
 
 git pull --rebase --autostash origin "%BRANCH%"
 if errorlevel 1 (
-  echo.
-  echo git pull --rebase --autostash failed. Trying manual stash flow...
-  echo.
-  set "STASH_CREATED="
-  for /f "delims=" %%s in ('git stash push -u -m "auto-stash(update-branch.bat)" 2^>nul') do (
-    echo %%s | findstr /i /c:"Saved working directory" >nul && set "STASH_CREATED=1"
-  )
-  git pull --rebase origin "%BRANCH%"
-  if errorlevel 1 (
-    echo git pull --rebase failed. Resolve conflicts then run again.
-    pause
-    exit /b 1
-  )
-  if defined STASH_CREATED (
-    git stash pop
-    if errorlevel 1 (
-      echo git stash pop had conflicts. Resolve and continue.
-      pause
-      exit /b 1
-    )
-  )
+  echo git pull --rebase --autostash failed.
+  pause
+  exit /b 1
 )
-
-echo.
-git status -sb
-echo.
 
 for /f "delims=" %%u in ('git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2^>nul') do set "UPSTREAM=%%u"
 if "%UPSTREAM%"=="" (
@@ -79,36 +57,35 @@ if "%UPSTREAM%"=="" (
     pause
     exit /b 1
   )
-  echo Done.
-  pause
-  exit /b 0
 )
 
 for /f "delims=" %%p in ('git status --porcelain 2^>nul') do set "HAS_CHANGES=1"
 if defined HAS_CHANGES (
-  echo.
-  echo Working tree has uncommitted changes, so nothing was pushed.
-  echo Please commit first, or run update-branch-autocommit.bat.
-  echo.
-  pause
-  exit /b 2
-)
-
-for /f "tokens=1,2" %%a in ('git rev-list --left-right --count "origin/%BRANCH%...%BRANCH%" 2^>nul') do (
-  set "BEHIND=%%a"
-  set "AHEAD=%%b"
-)
-
-if not "%AHEAD%"=="" if not "%AHEAD%"=="0" (
-  echo Pushing commits to origin/%BRANCH% ...
-  git push origin "%BRANCH%"
+  for /f "delims=" %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TS=%%t"
+  git add -A
   if errorlevel 1 (
-    echo git push failed.
+    echo git add failed.
+    pause
+    exit /b 1
+  )
+  git commit -m "chore: auto sync !TS!"
+  if errorlevel 1 (
+    echo git commit failed.
     pause
     exit /b 1
   )
 )
 
+git push origin "%BRANCH%"
+if errorlevel 1 (
+  echo git push failed.
+  pause
+  exit /b 1
+)
+
+echo.
+git status -sb
+echo.
 echo Done.
 pause
 exit /b 0
