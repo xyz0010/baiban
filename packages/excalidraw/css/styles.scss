@@ -802,3 +802,71 @@ body.excalidraw-cursor-resize * {
     font-family: "Assistant";
   }
 }
+
+.excalidraw-prompt-picker {
+  background: var(--island-bg-color);
+  box-shadow: var(--shadow-island);
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.excalidraw-prompt-picker__header {
+  color: var(--color-gray-60);
+  font-size: 12px;
+  padding: 2px 4px;
+  user-select: none;
+}
+
+.excalidraw-prompt-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: auto;
+  max-height: 240px;
+  min-width: 240px;
+}
+
+.excalidraw-prompt-picker__item {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+}
+
+.excalidraw-prompt-picker__item:hover {
+  background: var(--button-hover-bg);
+}
+
+.excalidraw-prompt-picker__item--active {
+  background: var(--color-primary-light);
+}
+
+.excalidraw-prompt-picker__title {
+  font-size: 13px;
+  color: var(--text-primary-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.excalidraw-prompt-picker__preview {
+  font-size: 12px;
+  color: var(--color-gray-60);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.excalidraw-prompt-picker__empty {
+  padding: 6px 8px;
+  color: var(--color-gray-60);
+  font-size: 12px;
+}

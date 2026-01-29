@@ -9,6 +9,7 @@ export type InlineMarkdownRun = {
   underline: boolean;
   code: boolean;
   link: string | null;
+  horizontalRule?: boolean;
 };
 
 export type MarkdownLine = {
@@ -603,14 +604,28 @@ export const parseMarkdownToBlocks = (text: string): MarkdownBlock[] => {
         type: "line",
         line: {
           runs: [
+            ...(quotePrefix
+              ? [
+                  {
+                    text: quotePrefix,
+                    bold: false,
+                    italic: false,
+                    strikethrough: false,
+                    underline: false,
+                    code: false,
+                    link: null,
+                  },
+                ]
+              : []),
             {
-              text: `${quotePrefix}────────────`,
+              text: "─",
               bold: false,
               italic: false,
               strikethrough: false,
               underline: false,
               code: false,
               link: null,
+              horizontalRule: true,
             },
           ],
           indentEm: bqLevel * 1.0,
@@ -883,14 +898,28 @@ export const parseMarkdownToLines = (text: string): MarkdownLine[] => {
     if (hr) {
       out.push({
         runs: [
+          ...(quotePrefix
+            ? [
+                {
+                  text: quotePrefix,
+                  bold: false,
+                  italic: false,
+                  strikethrough: false,
+                  underline: false,
+                  code: false,
+                  link: null,
+                },
+              ]
+            : []),
           {
-            text: `${quotePrefix}────────────`,
+            text: "─",
             bold: false,
             italic: false,
             strikethrough: false,
             underline: false,
             code: false,
             link: null,
+            horizontalRule: true,
           },
         ],
         indentEm: bqLevel * 1.0,

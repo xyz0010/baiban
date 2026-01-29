@@ -61,6 +61,7 @@ import { ImageExportDialog } from "./ImageExportDialog";
 import { Island } from "./Island";
 import { JSONExportDialog } from "./JSONExportDialog";
 import { LaserPointerButton } from "./LaserPointerButton";
+import { PromptLibraryDialog } from "./PromptLibraryDialog";
 
 import "./LayerUI.scss";
 import "./Toolbar.scss";
@@ -118,6 +119,7 @@ const DefaultMainMenu: React.FC<{
       <MainMenu.DefaultItems.ExportToObsidianMarkdownZip />
       <MainMenu.DefaultItems.ExportToOfflineHTML />
       <MainMenu.DefaultItems.SearchMenu />
+      <MainMenu.DefaultItems.PromptLibrary />
       <MainMenu.DefaultItems.Help />
       <MainMenu.DefaultItems.ClearCanvas />
       <MainMenu.Separator />
@@ -545,6 +547,7 @@ const LayerUI = ({
           }}
         />
       )}
+      <PromptLibraryDialog appState={appState} setAppState={setAppState} />
       <ActiveConfirmDialog />
       {appState.openDialog?.name === "elementLinkSelector" && (
         <ElementLinkDialog

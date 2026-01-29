@@ -1,0 +1,170 @@
+.PromptLibraryDialog {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.PromptLibraryDialog__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-right: 1px solid var(--dialog-border-color);
+  padding-right: 12px;
+  min-height: 0;
+}
+
+.PromptLibraryDialog__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.PromptLibraryDialog__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.PromptLibraryDialog__search {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--island-bg-color);
+  color: var(--text-primary-color);
+}
+
+.PromptLibraryDialog__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: visible;
+}
+
+.PromptLibraryDialog__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--island-bg-color);
+  color: var(--text-primary-color);
+  cursor: pointer;
+}
+
+.PromptLibraryDialog__item:hover {
+  background: var(--button-hover-bg);
+}
+
+.PromptLibraryDialog__item--active {
+  outline: 2px solid var(--color-primary);
+  border-color: transparent;
+}
+
+.PromptLibraryDialog__itemTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.PromptLibraryDialog__itemMeta {
+  color: var(--color-gray-60);
+  font-size: 12px;
+}
+
+.PromptLibraryDialog__empty {
+  padding: 10px;
+  color: var(--color-gray-60);
+}
+
+.PromptLibraryDialog__footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.PromptLibraryDialog__fileInput {
+  display: none;
+}
+
+.PromptLibraryDialog__error {
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.PromptLibraryDialog__settings {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.PromptLibraryDialog__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.PromptLibraryDialog__labelText {
+  color: var(--color-gray-60);
+  font-size: 12px;
+}
+
+.PromptLibraryDialog__select,
+.PromptLibraryDialog__title,
+.PromptLibraryDialog__tags {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--island-bg-color);
+  color: var(--text-primary-color);
+}
+
+.PromptLibraryDialog__content {
+  width: 100%;
+  height: clamp(260px, 44vh, 520px);
+  padding: 10px;
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--island-bg-color);
+  color: var(--text-primary-color);
+  resize: vertical;
+}
+
+.PromptLibraryDialog__placeholder {
+  color: var(--color-gray-60);
+  padding: 10px;
+}
+
+.PromptLibraryDialog__hint {
+  color: var(--color-gray-60);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .PromptLibraryDialog {
+    grid-template-columns: 1fr;
+  }
+
+  .PromptLibraryDialog__sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--dialog-border-color);
+    padding-right: 0;
+    padding-bottom: 12px;
+  }
+
+  .PromptLibraryDialog__label {
+    min-width: 0;
+  }
+}

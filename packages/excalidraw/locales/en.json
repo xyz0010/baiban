@@ -445,6 +445,30 @@
     "cropStart": "Crop image",
     "cropFinish": "Finish image cropping"
   },
+  "promptLibrary": {
+    "title": "Prompt library",
+    "searchPlaceholder": "Search prompts…",
+    "add": "Add",
+    "delete": "Delete",
+    "import": "Import JSON",
+    "export": "Export JSON",
+    "importInvalid": "Invalid prompt library JSON",
+    "empty": "No prompts",
+    "selectHint": "Select or create a prompt",
+    "titlePlaceholder": "Title",
+    "contentPlaceholder": "Prompt content",
+    "tags": "Tags",
+    "tagsPlaceholder": "tag1, tag2",
+    "variablesHint": "Variables: {{date}}, {{time}}, {{datetime}}",
+    "untitled": "Untitled",
+    "trigger": "Trigger",
+    "triggerBacktick": "` key",
+    "triggerCtrlBacktick": "Ctrl+`",
+    "triggerDisabled": "Disabled",
+    "anchor": "Popup position",
+    "anchorTextarea": "Near editor",
+    "anchorCaret": "Near caret"
+  },
   "clearCanvasDialog": {
     "title": "Clear canvas"
   },

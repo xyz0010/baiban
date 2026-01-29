@@ -201,6 +201,24 @@ describe("@excalidraw/common/markdown", () => {
           : "",
       ).toContain("a");
     });
+
+    it("parses horizontal rules into a dedicated run", () => {
+      const blocks = parseMarkdownToBlocks("---");
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]?.type).toBe("line");
+      expect(blocks[0] && blocks[0].type === "line"
+        ? blocks[0].line.runs.some((r) => r.horizontalRule)
+        : false,
+      ).toBe(true);
+
+      const bqBlocks = parseMarkdownToBlocks("> ---");
+      expect(bqBlocks).toHaveLength(1);
+      expect(bqBlocks[0]?.type).toBe("line");
+      if (bqBlocks[0] && bqBlocks[0].type === "line") {
+        expect(bqBlocks[0].line.runs[0]?.text).toBe("› ");
+        expect(bqBlocks[0].line.runs.some((r) => r.horizontalRule)).toBe(true);
+      }
+    });
   });
 
   describe("getStyledFontString()", () => {

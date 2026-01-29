@@ -444,6 +444,30 @@
     "cropStart": "裁剪图片",
     "cropFinish": "完成图片裁剪"
   },
+  "promptLibrary": {
+    "title": "提示词库",
+    "searchPlaceholder": "搜索提示词…",
+    "add": "新增",
+    "delete": "删除",
+    "import": "导入 JSON",
+    "export": "导出 JSON",
+    "importInvalid": "提示词库 JSON 无效",
+    "empty": "暂无提示词",
+    "selectHint": "请选择或新增一条提示词",
+    "titlePlaceholder": "标题",
+    "contentPlaceholder": "提示词内容",
+    "tags": "标签",
+    "tagsPlaceholder": "标签1, 标签2",
+    "variablesHint": "变量：{{date}}、{{time}}、{{datetime}}",
+    "untitled": "未命名",
+    "trigger": "触发键",
+    "triggerBacktick": "` 键",
+    "triggerCtrlBacktick": "Ctrl+`",
+    "triggerDisabled": "禁用",
+    "anchor": "弹窗位置",
+    "anchorTextarea": "靠近编辑框",
+    "anchorCaret": "靠近光标"
+  },
   "clearCanvasDialog": {
     "title": "清除画布"
   },

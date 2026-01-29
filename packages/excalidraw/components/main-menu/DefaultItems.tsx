@@ -191,6 +191,26 @@ export const SearchMenu = (opts?: { className?: string }) => {
 };
 SearchMenu.displayName = "SearchMenu";
 
+export const PromptLibrary = (opts?: { className?: string }) => {
+  const setAppState = useExcalidrawSetAppState();
+  const { t } = useI18n();
+
+  return (
+    <DropdownMenuItem
+      icon={boltIcon}
+      data-testid="prompt-library-button"
+      onSelect={() => {
+        setAppState({ openDialog: { name: "promptLibrary" } });
+      }}
+      aria-label={t("promptLibrary.title")}
+      className={opts?.className}
+    >
+      {t("promptLibrary.title")}
+    </DropdownMenuItem>
+  );
+};
+PromptLibrary.displayName = "PromptLibrary";
+
 export const Help = () => {
   const { t } = useI18n();
 

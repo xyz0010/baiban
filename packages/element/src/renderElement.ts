@@ -602,20 +602,23 @@ const drawElementOnCanvas = (
                 headingScale,
               );
               const indentPx = line.indentEm * element.fontSize;
-              let renderedLineWidth = 0;
-              for (const run of runs) {
-                if (!run.text) {
-                  continue;
+              const hasHorizontalRule = runs.some((r) => r.horizontalRule);
+              let renderedLineWidth = hasHorizontalRule ? element.width : 0;
+              if (!hasHorizontalRule) {
+                for (const run of runs) {
+                  if (!run.text) {
+                    continue;
+                  }
+                  const styledFontString = getStyledFontString(
+                    lineBaseFontString,
+                    run,
+                  ) as FontString;
+                  context.font = styledFontString;
+                  renderedLineWidth += context.measureText(run.text).width;
                 }
-                const styledFontString = getStyledFontString(
-                  lineBaseFontString,
-                  run,
-                ) as FontString;
-                context.font = styledFontString;
-                renderedLineWidth += context.measureText(run.text).width;
-              }
 
-              renderedLineWidth += indentPx;
+                renderedLineWidth += indentPx;
+              }
 
               const startX =
                 element.textAlign === "center"
@@ -634,6 +637,20 @@ const drawElementOnCanvas = (
                   run,
                 ) as FontString;
                 context.font = styledFontString;
+                if (run.horizontalRule) {
+                  context.save();
+                  context.globalAlpha *= 0.2;
+                  context.strokeStyle = element.strokeColor;
+                  context.lineWidth = Math.max(1, Math.round(lineFontSize / 20));
+                  context.beginPath();
+                  const ruleY = y - lineFontSize * 0.3;
+                  context.moveTo(x, ruleY);
+                  context.lineTo(element.width, ruleY);
+                  context.stroke();
+                  context.restore();
+                  continue;
+                }
+
                 context.fillStyle = run.link ? "#0b5fff" : element.strokeColor;
                 context.fillText(run.text, x, y);
                 const runWidth = context.measureText(run.text).width;

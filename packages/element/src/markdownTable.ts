@@ -67,8 +67,8 @@ export const layoutMarkdownTable = ({
   headerBold: boolean;
 }): MarkdownTableLayout => {
   const borderWidth = 1;
-  const paddingX = Math.max(4, Math.round(fontSize * 0.4));
-  const paddingY = Math.max(2, Math.round(fontSize * 0.2));
+  const paddingX = Math.max(8, Math.round(fontSize * 0.8));
+  const paddingY = Math.max(6, Math.round(fontSize * 0.8));
 
   const rows = table.rows;
   const colCount = Math.max(...rows.map((r) => r.length), 0);
@@ -232,4 +232,3 @@ export const measureCellLineWidth = (
 ) => {
   return measureRunsWidth(runs, baseFont);
 };
-

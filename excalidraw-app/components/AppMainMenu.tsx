@@ -30,6 +30,7 @@ export const AppMainMenu: React.FC<{
       <MainMenu.DefaultItems.ExportToOfflineHTML />
       <MainMenu.DefaultItems.CommandPalette className="highlighted" />
       <MainMenu.DefaultItems.SearchMenu />
+      <MainMenu.DefaultItems.PromptLibrary />
       <MainMenu.DefaultItems.Help />
       <MainMenu.DefaultItems.ClearCanvas />
       <MainMenu.Separator />

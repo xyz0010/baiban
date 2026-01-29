@@ -47,6 +47,13 @@ import type {
 import { actionSaveToActiveFile } from "../actions";
 
 import { parseDataTransferEvent } from "../clipboard";
+import type { PromptTemplate } from "../data/promptLibrary";
+import {
+  expandPromptVariables,
+  loadPromptLibrary,
+  markPromptTemplateUsed,
+  savePromptLibrary,
+} from "../data/promptLibrary";
 import {
   actionDecreaseFontSize,
   actionIncreaseFontSize,
@@ -110,6 +117,368 @@ export const textWysiwyg = ({
   app: App;
   autoSelect?: boolean;
 }): SubmitHandler => {
+  const textEditorContainer =
+    (excalidrawContainer?.querySelector(
+      ".excalidraw-textEditorContainer",
+    ) as HTMLDivElement | null) ?? null;
+
+  let promptPickerContainer: HTMLDivElement | null = null;
+  let promptPickerHeaderEl: HTMLDivElement | null = null;
+  let promptPickerListEl: HTMLDivElement | null = null;
+  let promptPickerQuery = "";
+  let promptPickerSelectedIndex = 0;
+  let promptPickerItems: PromptTemplate[] = [];
+  let promptPickerFilteredItems: PromptTemplate[] = [];
+  let promptPickerSettings: {
+    trigger: "backtick" | "ctrl_backtick" | "disabled";
+    anchor: "textarea" | "caret";
+  } = { trigger: "backtick", anchor: "textarea" };
+
+  const isPromptPickerOpen = () => !!promptPickerContainer;
+
+  const removePromptPicker = () => {
+    promptPickerContainer?.remove();
+    promptPickerContainer = null;
+    promptPickerHeaderEl = null;
+    promptPickerListEl = null;
+    promptPickerQuery = "";
+    promptPickerSelectedIndex = 0;
+    promptPickerItems = [];
+    promptPickerFilteredItems = [];
+  };
+
+  const getCaretClientRect = (
+    textarea: HTMLTextAreaElement,
+    position: number,
+  ) => {
+    const textareaRect = textarea.getBoundingClientRect();
+    const style = window.getComputedStyle(textarea);
+    const div = document.createElement("div");
+    const span = document.createElement("span");
+
+    div.style.position = "fixed";
+    div.style.left = `${textareaRect.left}px`;
+    div.style.top = `${textareaRect.top}px`;
+    div.style.visibility = "hidden";
+    div.style.whiteSpace = "pre-wrap";
+    div.style.wordBreak = "break-word";
+    div.style.overflow = "auto";
+
+    const mirroredProps = [
+      "boxSizing",
+      "width",
+      "height",
+      "overflowX",
+      "overflowY",
+      "borderTopWidth",
+      "borderRightWidth",
+      "borderBottomWidth",
+      "borderLeftWidth",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft",
+      "fontStyle",
+      "fontVariant",
+      "fontWeight",
+      "fontStretch",
+      "fontSize",
+      "fontSizeAdjust",
+      "lineHeight",
+      "fontFamily",
+      "textAlign",
+      "textTransform",
+      "textIndent",
+      "textDecoration",
+      "letterSpacing",
+      "wordSpacing",
+      "tabSize",
+      "MozTabSize",
+      "direction",
+    ] as const;
+
+    for (const prop of mirroredProps) {
+      const value = (style as any)[prop] as string | undefined;
+      if (value) {
+        (div.style as any)[prop] = value;
+      }
+    }
+
+    div.textContent = textarea.value.slice(0, position);
+    span.textContent = textarea.value.slice(position) || ".";
+    div.appendChild(span);
+    document.body.appendChild(div);
+
+    div.scrollTop = textarea.scrollTop;
+    div.scrollLeft = textarea.scrollLeft;
+
+    const rect = span.getBoundingClientRect();
+    div.remove();
+    return rect;
+  };
+
+  const positionPromptPicker = (editable: HTMLTextAreaElement) => {
+    if (!promptPickerContainer) {
+      return;
+    }
+    const rect =
+      promptPickerSettings.anchor === "caret"
+        ? getCaretClientRect(editable, editable.selectionEnd)
+        : editable.getBoundingClientRect();
+
+    let left = rect.left;
+    let top =
+      promptPickerSettings.anchor === "caret"
+        ? rect.top + rect.height + 6
+        : rect.bottom + 6;
+
+    promptPickerContainer.style.left = `${left}px`;
+    promptPickerContainer.style.top = `${top}px`;
+
+    const pickerRect = promptPickerContainer.getBoundingClientRect();
+    const margin = 8;
+
+    if (pickerRect.right > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - pickerRect.width - margin);
+    }
+
+    if (pickerRect.bottom > window.innerHeight - margin) {
+      const aboveTop = rect.top - pickerRect.height - 6;
+      top = Math.max(margin, aboveTop);
+    }
+
+    promptPickerContainer.style.left = `${left}px`;
+    promptPickerContainer.style.top = `${top}px`;
+  };
+
+  const renderPromptPicker = (editable: HTMLTextAreaElement) => {
+    if (!promptPickerContainer || !promptPickerHeaderEl || !promptPickerListEl) {
+      return;
+    }
+
+    promptPickerHeaderEl.textContent = promptPickerQuery
+      ? `\`${promptPickerQuery}\``
+      : "`";
+
+    while (promptPickerListEl.firstChild) {
+      promptPickerListEl.firstChild.remove();
+    }
+
+    const maxItems = 8;
+    const items = promptPickerFilteredItems.slice(0, maxItems);
+    items.forEach((item, idx) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className =
+        idx === promptPickerSelectedIndex
+          ? "excalidraw-prompt-picker__item excalidraw-prompt-picker__item--active"
+          : "excalidraw-prompt-picker__item";
+
+      const title = document.createElement("div");
+      title.className = "excalidraw-prompt-picker__title";
+      title.textContent = item.title || "Untitled";
+
+      const preview = document.createElement("div");
+      preview.className = "excalidraw-prompt-picker__preview";
+      preview.textContent = item.content;
+
+      row.appendChild(title);
+      row.appendChild(preview);
+      row.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      row.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        insertPromptTemplate(editable, item);
+      });
+
+      promptPickerListEl!.appendChild(row);
+    });
+
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "excalidraw-prompt-picker__empty";
+      empty.textContent = "No prompts";
+      promptPickerListEl.appendChild(empty);
+    }
+
+    requestAnimationFrame(() => {
+      positionPromptPicker(editable);
+      const active = promptPickerListEl?.querySelector(
+        ".excalidraw-prompt-picker__item--active",
+      );
+      if (active instanceof HTMLElement) {
+        active.scrollIntoView?.({ block: "nearest" });
+      }
+    });
+  };
+
+  const filterPromptPicker = () => {
+    const needle = promptPickerQuery.trim().toLowerCase();
+    promptPickerFilteredItems = needle
+      ? promptPickerItems.filter((item) => {
+          const hay = `${item.title}\n${item.content}`.toLowerCase();
+          return hay.includes(needle);
+        })
+      : promptPickerItems;
+    promptPickerSelectedIndex = Math.min(
+      promptPickerSelectedIndex,
+      Math.max(0, promptPickerFilteredItems.length - 1),
+    );
+  };
+
+  const insertAtSelection = (editable: HTMLTextAreaElement, text: string) => {
+    const { selectionStart, selectionEnd } = editable;
+    const value = editable.value;
+    editable.value =
+      value.slice(0, selectionStart) + text + value.slice(selectionEnd);
+    const nextPos = selectionStart + text.length;
+    editable.selectionStart = nextPos;
+    editable.selectionEnd = nextPos;
+    editable.dispatchEvent(new Event("input"));
+  };
+
+  const insertPromptTemplate = (editable: HTMLTextAreaElement, item: PromptTemplate) => {
+    const expanded = expandPromptVariables(item.content);
+    insertAtSelection(editable, expanded);
+    const latest = loadPromptLibrary();
+    savePromptLibrary(markPromptTemplateUsed(latest, item.id));
+    removePromptPicker();
+  };
+
+  const openPromptPicker = (editable: HTMLTextAreaElement) => {
+    const data = loadPromptLibrary();
+    promptPickerItems = [...data.items].sort((a, b) => {
+      const aCount = a.useCount ?? 0;
+      const bCount = b.useCount ?? 0;
+      if (aCount !== bCount) {
+        return bCount - aCount;
+      }
+      if (a.updatedAt !== b.updatedAt) {
+        return b.updatedAt - a.updatedAt;
+      }
+      return a.title.localeCompare(b.title);
+    });
+    promptPickerSettings = data.settings ?? promptPickerSettings;
+    promptPickerQuery = "";
+    promptPickerSelectedIndex = 0;
+    filterPromptPicker();
+
+    if (!textEditorContainer) {
+      insertAtSelection(editable, "`");
+      return;
+    }
+    if (!promptPickerContainer) {
+      promptPickerContainer = document.createElement("div");
+      promptPickerContainer.className = "excalidraw-prompt-picker";
+      promptPickerContainer.style.position = "fixed";
+      promptPickerContainer.style.zIndex = "calc(var(--zIndex-wysiwyg) + 1)";
+      promptPickerContainer.style.maxWidth = "min(520px, 80vw)";
+      promptPickerContainer.style.maxHeight = "min(300px, 50vh)";
+
+      promptPickerHeaderEl = document.createElement("div");
+      promptPickerHeaderEl.className = "excalidraw-prompt-picker__header";
+
+      promptPickerListEl = document.createElement("div");
+      promptPickerListEl.className = "excalidraw-prompt-picker__list";
+
+      promptPickerContainer.appendChild(promptPickerHeaderEl);
+      promptPickerContainer.appendChild(promptPickerListEl);
+
+      promptPickerContainer.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      promptPickerContainer.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+
+      textEditorContainer.appendChild(promptPickerContainer);
+    }
+
+    renderPromptPicker(editable);
+  };
+
+  const closePromptPicker = () => {
+    removePromptPicker();
+  };
+
+  const handlePromptPickerKeyDown = (
+    editable: HTMLTextAreaElement,
+    event: KeyboardEvent,
+  ) => {
+    if (!isPromptPickerOpen()) {
+      return false;
+    }
+
+    if (event.key === KEYS.ESCAPE) {
+      event.preventDefault();
+      closePromptPicker();
+      return true;
+    }
+
+    if (event.code === "Backquote" && !promptPickerQuery) {
+      event.preventDefault();
+      closePromptPicker();
+      insertAtSelection(editable, "`");
+      return true;
+    }
+
+    if (event.key === KEYS.ENTER) {
+      event.preventDefault();
+      const item = promptPickerFilteredItems[promptPickerSelectedIndex];
+      if (item) {
+        insertPromptTemplate(editable, item);
+      } else {
+        closePromptPicker();
+      }
+      return true;
+    }
+
+    if (event.key === KEYS.ARROW_DOWN) {
+      event.preventDefault();
+      promptPickerSelectedIndex = Math.min(
+        promptPickerSelectedIndex + 1,
+        Math.max(0, promptPickerFilteredItems.length - 1),
+      );
+      renderPromptPicker(editable);
+      return true;
+    }
+
+    if (event.key === KEYS.ARROW_UP) {
+      event.preventDefault();
+      promptPickerSelectedIndex = Math.max(promptPickerSelectedIndex - 1, 0);
+      renderPromptPicker(editable);
+      return true;
+    }
+
+    if (event.key === KEYS.BACKSPACE) {
+      event.preventDefault();
+      promptPickerQuery = promptPickerQuery.slice(0, -1);
+      filterPromptPicker();
+      renderPromptPicker(editable);
+      return true;
+    }
+
+    if (
+      event.key.length === 1 &&
+      !event[KEYS.CTRL_OR_CMD] &&
+      !event.altKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault();
+      promptPickerQuery += event.key;
+      filterPromptPicker();
+      renderPromptPicker(editable);
+      return true;
+    }
+
+    return false;
+  };
+
   const textPropertiesUpdated = (
     updatedTextElement: ExcalidrawTextElement,
     editable: HTMLTextAreaElement,
@@ -273,6 +642,9 @@ export const textWysiwyg = ({
       }
 
       app.scene.mutateElement(updatedTextElement, { x: coordX, y: coordY });
+      if (isPromptPickerOpen()) {
+        positionPromptPicker(editable);
+      }
     }
   };
 
@@ -391,6 +763,29 @@ export const textWysiwyg = ({
   }
 
   editable.onkeydown = (event) => {
+    if (handlePromptPickerKeyDown(editable, event)) {
+      return;
+    }
+
+    const promptSettings = loadPromptLibrary().settings ?? promptPickerSettings;
+    const isBackquoteKey =
+      event.code === "Backquote" && !event.isComposing && event.keyCode !== 229;
+    const shouldOpenPromptPicker =
+      promptSettings.trigger === "backtick"
+        ? isBackquoteKey &&
+          !event[KEYS.CTRL_OR_CMD] &&
+          !event.altKey &&
+          !event.metaKey
+        : promptSettings.trigger === "ctrl_backtick"
+          ? isBackquoteKey && !!event[KEYS.CTRL_OR_CMD]
+          : false;
+
+    if (shouldOpenPromptPicker) {
+      event.preventDefault();
+      openPromptPicker(editable);
+      return;
+    }
+
     if (!event.shiftKey && actionZoomIn.keyTest(event)) {
       event.preventDefault();
       app.actionManager.executeAction(actionZoomIn);
@@ -607,6 +1002,7 @@ export const textWysiwyg = ({
     editable.onblur = null;
     editable.oninput = null;
     editable.onkeydown = null;
+    closePromptPicker();
 
     if (observer) {
       observer.disconnect();

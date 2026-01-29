@@ -9,6 +9,7 @@ import {
   FONT_FAMILY,
   TEXT_ALIGN,
   VERTICAL_ALIGN,
+  EDITOR_LS_KEYS,
 } from "@excalidraw/common";
 
 import type {
@@ -1660,6 +1661,158 @@ describe("textWysiwyg", () => {
       Keyboard.exitTextEditor(editor);
 
       expect(h.elements[1].angle).toBe(30);
+    });
+  });
+
+  describe("prompt picker", () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("should open on backquote and insert selected prompt", async () => {
+      await render(<Excalidraw handleKeyboardGlobally={true} />);
+      API.setElements([]);
+
+      window.localStorage.setItem(
+        EDITOR_LS_KEYS.PROMPT_LIBRARY,
+        JSON.stringify({
+          version: 1,
+          items: [
+            {
+              id: "p1",
+              title: "Greeting",
+              content: "PROMPT",
+              createdAt: 1,
+              updatedAt: 1,
+              useCount: 0,
+            },
+          ],
+          settings: { trigger: "backtick", anchor: "textarea" },
+        }),
+      );
+
+      const text = API.createElement({
+        type: "text",
+        text: "Hello ",
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 30,
+      });
+      API.setElements([text]);
+      API.setSelectedElements([text]);
+
+      Keyboard.keyPress(KEYS.ENTER);
+      const editor = await getTextEditor();
+
+      editor.selectionStart = editor.value.length;
+      editor.selectionEnd = editor.value.length;
+
+      fireEvent.keyDown(editor, { key: "`", code: "Backquote" });
+      expect(
+        document.querySelector(".excalidraw-prompt-picker"),
+      ).not.toBeNull();
+
+      fireEvent.keyDown(editor, { key: KEYS.ENTER });
+      expect(document.querySelector(".excalidraw-prompt-picker")).toBeNull();
+      expect(editor.value).toBe("Hello PROMPT");
+    });
+
+    it("should insert literal backquote on ``", async () => {
+      await render(<Excalidraw handleKeyboardGlobally={true} />);
+      API.setElements([]);
+
+      window.localStorage.setItem(
+        EDITOR_LS_KEYS.PROMPT_LIBRARY,
+        JSON.stringify({
+          version: 1,
+          items: [],
+          settings: { trigger: "backtick", anchor: "textarea" },
+        }),
+      );
+
+      const text = API.createElement({
+        type: "text",
+        text: "",
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 30,
+      });
+      API.setElements([text]);
+      API.setSelectedElements([text]);
+
+      Keyboard.keyPress(KEYS.ENTER);
+      const editor = await getTextEditor();
+
+      fireEvent.keyDown(editor, { key: "`", code: "Backquote" });
+      expect(document.querySelector(".excalidraw-prompt-picker")).not.toBeNull();
+
+      fireEvent.keyDown(editor, { key: "`", code: "Backquote" });
+      expect(document.querySelector(".excalidraw-prompt-picker")).toBeNull();
+      expect(editor.value).toBe("`");
+    });
+
+    it("should sort prompts by use count", async () => {
+      await render(<Excalidraw handleKeyboardGlobally={true} />);
+      API.setElements([]);
+
+      window.localStorage.setItem(
+        EDITOR_LS_KEYS.PROMPT_LIBRARY,
+        JSON.stringify({
+          version: 1,
+          items: [
+            {
+              id: "p1",
+              title: "Low",
+              content: "A",
+              createdAt: 1,
+              updatedAt: 10,
+              useCount: 1,
+            },
+            {
+              id: "p2",
+              title: "High",
+              content: "B",
+              createdAt: 1,
+              updatedAt: 5,
+              useCount: 10,
+            },
+            {
+              id: "p3",
+              title: "Mid",
+              content: "C",
+              createdAt: 1,
+              updatedAt: 20,
+              useCount: 3,
+            },
+          ],
+          settings: { trigger: "backtick", anchor: "textarea" },
+        }),
+      );
+
+      const text = API.createElement({
+        type: "text",
+        text: "",
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 30,
+      });
+      API.setElements([text]);
+      API.setSelectedElements([text]);
+
+      Keyboard.keyPress(KEYS.ENTER);
+      const editor = await getTextEditor();
+
+      fireEvent.keyDown(editor, { key: "`", code: "Backquote" });
+      expect(document.querySelector(".excalidraw-prompt-picker")).not.toBeNull();
+
+      const titles = Array.from(
+        document.querySelectorAll(".excalidraw-prompt-picker__title"),
+      ).map((el) => el.textContent);
+
+      expect(titles).toEqual(["High", "Mid", "Low"]);
     });
   });
 });
