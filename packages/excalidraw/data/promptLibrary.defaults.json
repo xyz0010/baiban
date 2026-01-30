@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "items": [{ "title": "日报模板", "content": "1. 今日完成：\n2. 明日计划：\n3. 风险阻塞：" },
+    { "title": "会议纪要", "content": "时间：\n参会：\n结论：\nAction：" }]
+}

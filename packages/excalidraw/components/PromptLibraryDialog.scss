@@ -79,6 +79,39 @@
   font-size: 12px;
 }
 
+.PromptLibraryDialog__bulkImport {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--island-bg-color);
+}
+
+.PromptLibraryDialog__bulkTextarea {
+  
+  min-height: 120px;
+  max-height: 260px;
+  padding: 10px;
+  border: 1px solid var(--dialog-border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--island-bg-color);
+  color: var(--text-primary-color);
+  resize: vertical;
+}
+
+.PromptLibraryDialog__bulkActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.PromptLibraryDialog__bulkError {
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
 .PromptLibraryDialog__empty {
   padding: 10px;
   color: var(--color-gray-60);

@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 
 import type { JSONValue } from "../types";
 import { EditorLocalStorage } from "./EditorLocalStorage";
+import bundledDefaults from "./promptLibrary.defaults.json";
 
 export type PromptTemplate = {
   id: string;
@@ -107,9 +108,57 @@ const normalizeData = (value: unknown): PromptLibraryData => {
   };
 };
 
+const normalizeBundledDefaults = (value: unknown): PromptLibraryData => {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.items)) {
+    return { version: 1, items: [], settings: DEFAULT_DATA.settings };
+  }
+  const items: PromptTemplate[] = [];
+  for (const item of value.items) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const title = typeof item.title === "string" ? item.title.trim() : "";
+    const content = typeof item.content === "string" ? item.content : "";
+    if (!title) {
+      continue;
+    }
+    const tags = isStringArray(item.tags) ? item.tags : undefined;
+    items.push({
+      id: `default:${title.toLowerCase()}`,
+      title,
+      content,
+      createdAt: 0,
+      updatedAt: 0,
+      useCount: 0,
+      ...(tags ? { tags } : null),
+    });
+  }
+  const settings = normalizeSettings(value.settings);
+  return { version: 1, items, settings };
+};
+
 export const loadPromptLibrary = (): PromptLibraryData => {
   const raw = EditorLocalStorage.get<JSONValue>(EDITOR_LS_KEYS.PROMPT_LIBRARY);
-  return normalizeData(raw);
+  const stored = normalizeData(raw);
+  const defaults = normalizeBundledDefaults(bundledDefaults as unknown);
+  if (!defaults.items.length) {
+    return stored;
+  }
+  const existingTitles = new Set(
+    stored.items.map((item) => item.title.trim().toLowerCase()),
+  );
+  const mergedItems = stored.items.slice();
+  for (const item of defaults.items) {
+    const key = item.title.trim().toLowerCase();
+    if (!existingTitles.has(key)) {
+      mergedItems.push(item);
+    }
+  }
+  return {
+    version: 1,
+    items: mergedItems.sort((a, b) => b.updatedAt - a.updatedAt),
+    settings: stored.settings ?? defaults.settings ?? DEFAULT_DATA.settings,
+  };
 };
 
 export const savePromptLibrary = (data: PromptLibraryData) => {

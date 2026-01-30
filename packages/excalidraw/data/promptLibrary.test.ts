@@ -15,7 +15,7 @@ describe("promptLibrary", () => {
   it("should return defaults on empty storage", () => {
     const data = loadPromptLibrary();
     expect(data.version).toBe(1);
-    expect(data.items).toEqual([]);
+    expect(Array.isArray(data.items)).toBe(true);
     expect(data.settings).toEqual({ trigger: "backtick", anchor: "textarea" });
   });
 
@@ -51,7 +51,8 @@ describe("promptLibrary", () => {
   it("should fallback on invalid stored data", () => {
     window.localStorage.setItem(EDITOR_LS_KEYS.PROMPT_LIBRARY, "not-json");
     const data = loadPromptLibrary();
-    expect(data.items).toEqual([]);
+    expect(data.version).toBe(1);
+    expect(Array.isArray(data.items)).toBe(true);
   });
 
   it("should expand variables", () => {
@@ -83,5 +84,34 @@ describe("promptLibrary", () => {
       data = markPromptTemplateUsed(data, "p1");
     }
     expect(data.items[0].useCount).toBe(6);
+  });
+
+  it("should not dedupe stored items with the same title", () => {
+    const ok = savePromptLibrary({
+      version: 1,
+      items: [
+        {
+          id: "p1",
+          title: "Untitled",
+          content: "A",
+          createdAt: 1,
+          updatedAt: 1,
+          useCount: 0,
+        },
+        {
+          id: "p2",
+          title: "Untitled",
+          content: "B",
+          createdAt: 2,
+          updatedAt: 2,
+          useCount: 0,
+        },
+      ],
+      settings: { trigger: "backtick", anchor: "textarea" },
+    });
+    expect(ok).toBe(true);
+
+    const data = loadPromptLibrary();
+    expect(data.items.filter((i) => i.title === "Untitled").length).toBe(2);
   });
 });
