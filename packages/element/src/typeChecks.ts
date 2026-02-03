@@ -378,9 +378,9 @@ export const getLinearElementSubType = (
  *  canBecomePolygon(points).
  */
 export const isValidPolygon = (
-  points: ExcalidrawLineElement["points"],
+  points: ExcalidrawLineElement["points"] | null | undefined,
 ): boolean => {
-  return points.length > 3 && pointsEqual(points[0], points[points.length - 1]);
+  return !!points && points.length > 3 && pointsEqual(points[0], points[points.length - 1]);
 };
 
 export const canBecomePolygon = (

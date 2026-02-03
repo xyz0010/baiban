@@ -117,6 +117,7 @@
     "flipHorizontal": "水平翻转",
     "flipVertical": "垂直翻转",
     "viewMode": "查看模式",
+    "presentationMode": "演示模式",
     "share": "分享",
     "showStroke": "显示描边颜色选择器",
     "showBackground": "显示背景颜色选择器",

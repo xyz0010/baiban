@@ -398,7 +398,7 @@ export const restoreElement = (
         y,
         ...(isLineElement(element)
           ? {
-              polygon: isValidPolygon(element.points)
+              polygon: isValidPolygon(points)
                 ? element.polygon ?? false
                 : false,
             }
@@ -624,7 +624,8 @@ export const restoreElements = (
         const localElement = localElementsMap?.get(element.id);
 
         const shouldMarkAsDeleted =
-          opts?.deleteInvisibleElements && isInvisiblySmallElement(element);
+          opts?.deleteInvisibleElements &&
+          isInvisiblySmallElement(migratedElement);
 
         if (
           shouldMarkAsDeleted ||

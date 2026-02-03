@@ -31,13 +31,14 @@ export const isInvisiblySmallElement = (
   element: ExcalidrawElement,
 ): boolean => {
   if (isLinearElement(element) || isFreeDrawElement(element)) {
+    const points = Array.isArray(element.points) ? element.points : [];
     return (
-      element.points.length < 2 ||
-      (element.points.length === 2 &&
+      points.length < 2 ||
+      (points.length === 2 &&
         isArrowElement(element) &&
         pointsEqual(
-          element.points[0],
-          element.points[element.points.length - 1],
+          points[0],
+          points[points.length - 1],
           INVISIBLY_SMALL_ELEMENT_SIZE,
         ))
     );

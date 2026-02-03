@@ -419,9 +419,11 @@ export interface AppState {
   selectedGroupIds: { [groupId: string]: boolean };
   /** collapsed groups */
   collapsedGroupIds: { [groupId: string]: boolean };
+  groupNameById: { [groupId: string]: string };
   /** group being edited when you drill down to its constituent element
     (e.g. when you double-click on a group's element) */
   editingGroupId: GroupId | null;
+  editingGroupNameId: GroupId | null;
   width: number;
   height: number;
   offsetTop: number;

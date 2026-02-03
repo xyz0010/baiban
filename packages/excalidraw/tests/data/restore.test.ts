@@ -13,6 +13,7 @@ import type {
   ExcalidrawElement,
   ExcalidrawFreeDrawElement,
   ExcalidrawLinearElement,
+  ExcalidrawLineElement,
   ExcalidrawTextElement,
 } from "@excalidraw/element/types";
 import type { NormalizedZoomValue } from "@excalidraw/excalidraw/types";
@@ -334,6 +335,35 @@ describe("restoreElements", () => {
     )[0] as ExcalidrawLinearElement;
 
     expect(restoredLine.points).toMatchObject(expectedLinePoints);
+  });
+
+  it("when element.points of a line element is undefined", () => {
+    const lineElement: any = API.createElement({
+      type: "line",
+      width: 100,
+      height: 200,
+    });
+
+    Object.defineProperty(lineElement, "points", {
+      get: vi.fn(() => undefined),
+    });
+
+    expect(() =>
+      restore.restoreElements([lineElement], null, {
+        deleteInvisibleElements: true,
+      }),
+    ).not.toThrow();
+
+    const restoredLine = restore.restoreElements(
+      [lineElement],
+      null,
+    )[0] as ExcalidrawLineElement;
+
+    expect(restoredLine.points).toEqual([
+      [0, 0],
+      [lineElement.width, lineElement.height],
+    ]);
+    expect(restoredLine.polygon).toBe(false);
   });
 
   it("when the number of points of a line is greater or equal 2", () => {

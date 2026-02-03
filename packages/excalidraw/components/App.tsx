@@ -606,6 +606,8 @@ class App extends React.Component<AppProps, AppState> {
     editorInterfaceContextInitialValue,
   );
 
+  private currentPresentationFrameId: ExcalidrawFrameElement["id"] | null = null;
+
   private excalidrawContainerRef = React.createRef<HTMLDivElement>();
 
   public scene: Scene;
@@ -1918,6 +1920,190 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
+  private getCollapsedGroupTitle = (
+    groupElements: readonly ExcalidrawElement[],
+  ): string => {
+    const frameLike = groupElements.find((el) => isFrameLikeElement(el));
+    if (frameLike) {
+      return getFrameLikeTitle(frameLike);
+    }
+
+    const textLike = groupElements.find(
+      (el) =>
+        isTextElement(el) &&
+        (el as ExcalidrawTextElement).text.trim().length > 0,
+    ) as ExcalidrawTextElement | undefined;
+
+    if (textLike) {
+      const firstLine = textLike.text.trim().split(/\r?\n/)[0];
+      const maxLen = 40;
+      return firstLine.length > maxLen
+        ? `${firstLine.slice(0, maxLen - 1)}…`
+        : firstLine;
+    }
+
+    return `${t("element.group")} (${groupElements.length})`;
+  };
+
+  private renderCollapsedGroupNames = () => {
+    const { collapsedGroupIds } = this.state;
+    if (!collapsedGroupIds) {
+      return null;
+    }
+
+    const collapsedGroupIdsToRender = Object.keys(collapsedGroupIds).filter(
+      (id) => collapsedGroupIds[id],
+    );
+
+    if (collapsedGroupIdsToRender.length === 0) {
+      return null;
+    }
+
+    const isDarkTheme = this.state.theme === THEME.DARK;
+    const elements = this.scene.getNonDeletedElements();
+
+    return collapsedGroupIdsToRender.map((groupId) => {
+      const groupElements = getElementsInGroup(elements, groupId);
+      if (groupElements.length === 0) {
+        return null;
+      }
+
+      const [x1, y1, x2, y2] = getCommonBounds(groupElements);
+      const topLeft = sceneCoordsToViewportCoords(
+        { sceneX: x1, sceneY: y1 },
+        this.state,
+      );
+      const bottomRight = sceneCoordsToViewportCoords(
+        { sceneX: x2, sceneY: y2 },
+        this.state,
+      );
+
+      const minX = Math.min(topLeft.x, bottomRight.x);
+      const maxX = Math.max(topLeft.x, bottomRight.x);
+      const minY = Math.min(topLeft.y, bottomRight.y);
+      const maxY = Math.max(topLeft.y, bottomRight.y);
+
+      if (
+        maxX < 0 ||
+        maxY < 0 ||
+        minX > this.state.width ||
+        minY > this.state.height
+      ) {
+        return null;
+      }
+
+      const groupNameFromState = this.state.groupNameById?.[groupId]?.trim();
+      const title = groupNameFromState
+        ? groupNameFromState
+        : this.getCollapsedGroupTitle(groupElements);
+
+      const isEditing = this.state.editingGroupNameId === groupId;
+      const GROUP_NAME_EDIT_PADDING = 6;
+
+      const groupNameJSX = isEditing ? (
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => {
+            this.setState((prevState) => ({
+              groupNameById: {
+                ...prevState.groupNameById,
+                [groupId]: e.target.value,
+              },
+            }));
+          }}
+          onFocus={(e) => e.target.select()}
+          onBlur={() => {
+            this.setState((prevState) => {
+              const rawValue = prevState.groupNameById?.[groupId] ?? "";
+              const nextValue = rawValue.trim();
+              const nextGroupNameById = { ...prevState.groupNameById };
+              if (nextValue) {
+                nextGroupNameById[groupId] = nextValue;
+              } else {
+                delete nextGroupNameById[groupId];
+              }
+              return {
+                groupNameById: nextGroupNameById,
+                editingGroupNameId: null,
+              };
+            });
+          }}
+          onKeyDown={(event) => {
+            if (event.key === KEYS.ESCAPE || event.key === KEYS.ENTER) {
+              (event.target as HTMLInputElement).blur();
+            }
+          }}
+          style={{
+            background: this.state.viewBackgroundColor,
+            filter: isDarkTheme ? THEME_FILTER : "none",
+            zIndex: 2,
+            border: "none",
+            display: "block",
+            padding: `${GROUP_NAME_EDIT_PADDING}px`,
+            borderRadius: 4,
+            boxShadow: "inset 0 0 0 1px var(--color-primary)",
+            fontFamily: "Assistant",
+            fontSize: `${FRAME_STYLE.nameFontSize}px`,
+            transform: `translate(0px, ${GROUP_NAME_EDIT_PADDING}px)`,
+            color: "var(--color-gray-80)",
+            overflow: "hidden",
+            maxWidth: `${document.body.clientWidth - topLeft.x - GROUP_NAME_EDIT_PADDING}px`,
+          }}
+          size={title.length + 1 || 1}
+          dir="auto"
+          autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
+        />
+      ) : (
+        title
+      );
+
+      return (
+        <div
+          className={CLASSES.FRAME_NAME}
+          key={`collapsed-group-name-${groupId}`}
+          style={{
+            position: "absolute",
+            bottom: `${
+              this.state.height +
+              FRAME_STYLE.nameOffsetY -
+              topLeft.y +
+              this.state.offsetTop
+            }px`,
+            left: `${topLeft.x - this.state.offsetLeft}px`,
+            zIndex: 2,
+            fontSize: FRAME_STYLE.nameFontSize,
+            color: isDarkTheme
+              ? FRAME_STYLE.nameColorDarkTheme
+              : FRAME_STYLE.nameColorLightTheme,
+            lineHeight: FRAME_STYLE.nameLineHeight,
+            width: "max-content",
+            maxWidth: `${(x2 - x1) * this.state.zoom.value}px`,
+            overflow: isEditing ? "visible" : "hidden",
+            whiteSpace: "nowrap",
+            textOverflow: "ellipsis",
+            cursor: CURSOR_TYPE.MOVE,
+            pointerEvents: this.state.viewModeEnabled
+              ? POINTER_EVENTS.disabled
+              : POINTER_EVENTS.enabled,
+          }}
+          onPointerDown={(event) => this.handleCanvasPointerDown(event)}
+          onWheel={(event) => this.handleWheel(event)}
+          onContextMenu={this.handleCanvasContextMenu}
+          onDoubleClick={() => {
+            this.setState({
+              editingGroupNameId: groupId,
+            });
+          }}
+        >
+          {groupNameJSX}
+        </div>
+      );
+    });
+  };
+
   private toggleOverscrollBehavior(event: React.PointerEvent) {
     // when pointer inside editor, disable overscroll behavior to prevent
     // panning to trigger history back/forward on MacOS Chrome
@@ -2245,6 +2431,7 @@ class App extends React.Component<AppProps, AppState> {
                             onDisconnect={this.maybeUnfollowRemoteUser}
                           />
                         )}
+                        {this.renderCollapsedGroupNames()}
                         {this.renderFrameNames()}
                         {this.state.activeLockedId && (
                           <UnlockPopup
@@ -4855,6 +5042,7 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     const nextFrame = sortedFrames[nextIndex];
+    this.currentPresentationFrameId = nextFrame.id;
     const scaleX = this.state.width / nextFrame.width;
     const scaleY = this.state.height / nextFrame.height;
     const zoomValue = Math.min(scaleX, scaleY);
@@ -7603,6 +7791,36 @@ class App extends React.Component<AppProps, AppState> {
     return null;
   };
 
+  private getCollapsedGroupIdAtPosition = (
+    x: number,
+    y: number,
+  ): string | null => {
+    const { collapsedGroupIds } = this.state;
+    if (!collapsedGroupIds) {
+      return null;
+    }
+
+    const elements = this.scene.getNonDeletedElements();
+    const groupsToCheck = Object.keys(collapsedGroupIds).filter(
+      (id) => collapsedGroupIds[id],
+    );
+
+    for (const groupId of groupsToCheck) {
+      const groupElements = getElementsInGroup(elements, groupId);
+      if (groupElements.length === 0) {
+        continue;
+      }
+
+      const [x1, y1, x2, y2] = getCommonBounds(groupElements);
+
+      if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+        return groupId;
+      }
+    }
+
+    return null;
+  };
+
   private handleCanvasPointerDown = (
     event: React.PointerEvent<HTMLElement>,
   ) => {
@@ -8590,6 +8808,25 @@ class App extends React.Component<AppProps, AppState> {
               pointerDownState.origin.x,
               pointerDownState.origin.y,
             );
+
+          if (!pointerDownState.hit.element) {
+            const collapsedGroupId = this.getCollapsedGroupIdAtPosition(
+              pointerDownState.origin.x,
+              pointerDownState.origin.y,
+            );
+
+            if (collapsedGroupId) {
+              const groupElements = getElementsInGroup(
+                this.scene.getNonDeletedElements(),
+                collapsedGroupId,
+              );
+
+              if (groupElements.length > 0) {
+                pointerDownState.hit.element =
+                  groupElements[groupElements.length - 1];
+              }
+            }
+          }
         }
 
         this.hitLinkElement = this.getElementLinkAtPosition(

@@ -1280,6 +1280,7 @@ export const ShapesSwitcher = ({
             }
             icon={presentationIcon}
             data-testid="toolbar-presentation-mode"
+            shortcut="Shift+R"
           >
             {t("labels.presentationMode")}
           </DropdownMenu.Item>
