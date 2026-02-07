@@ -4,6 +4,7 @@ import * as Popover from "@radix-ui/react-popover";
 
 import {
   CLASSES,
+  EVENT,
   KEYS,
   capitalizeString,
   isTransparent,
@@ -13,6 +14,7 @@ import {
   shouldAllowVerticalAlign,
   suppportsHorizontalAlign,
   hasBoundTextElement,
+  isFrameLikeElement,
   isElbowArrow,
   isImageElement,
   isLinearElement,
@@ -66,6 +68,7 @@ import { ToolPopover } from "./ToolPopover";
 import { Tooltip } from "./Tooltip";
 import DropdownMenu from "./dropdownMenu/DropdownMenu";
 import { PropertiesPopover } from "./PropertiesPopover";
+import FrameSize from "./Stats/FrameSize";
 import {
   EmbedIcon,
   extraToolsIcon,
@@ -83,6 +86,7 @@ import {
   SelectionIcon,
   pencilIcon,
   presentationIcon,
+  recordingIcon,
 } from "./icons";
 
 import { Island } from "./Island";
@@ -213,6 +217,10 @@ export const SelectedShapeActions = ({
   const isTableSelected = targetElements.some(
     (el) => (el.type as string) === "table",
   );
+  const frameSizeTarget = (() => {
+    const frameLikeElements = targetElements.filter(isFrameLikeElement);
+    return frameLikeElements.length === 1 ? frameLikeElements[0] : null;
+  })();
 
   return (
     <div className={PROPERTIES_CLASSES}>
@@ -274,6 +282,15 @@ export const SelectedShapeActions = ({
       )}
 
       {renderAction("changeOpacity")}
+
+      {frameSizeTarget && (
+        <FrameSize
+          element={frameSizeTarget}
+          scene={app.scene}
+          appState={app.state}
+          app={app}
+        />
+      )}
 
       <fieldset>
         <legend>{t("labels.layers")}</legend>
@@ -1283,6 +1300,13 @@ export const ShapesSwitcher = ({
             shortcut="Shift+R"
           >
             {t("labels.presentationMode")}
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() => window.dispatchEvent(new Event(EVENT.TOGGLE_RECORDING))}
+            icon={recordingIcon}
+            data-testid="toolbar-recording"
+          >
+            {t("labels.recording")}
           </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={() =>

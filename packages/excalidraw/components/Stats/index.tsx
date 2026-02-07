@@ -7,6 +7,7 @@ import { STATS_PANELS } from "@excalidraw/common";
 import { getCommonBounds } from "@excalidraw/element";
 import { getUncroppedWidthAndHeight } from "@excalidraw/element";
 import { isImageElement } from "@excalidraw/element";
+import { isFrameLikeElement } from "@excalidraw/element";
 
 import { frameAndChildrenSelectedTogether } from "@excalidraw/element";
 
@@ -24,6 +25,7 @@ import Angle from "./Angle";
 import CanvasGrid from "./CanvasGrid";
 import Collapsible from "./Collapsible";
 import Dimension from "./Dimension";
+import FrameSize from "./FrameSize";
 import FontSize from "./FontSize";
 import MultiAngle from "./MultiAngle";
 import MultiDimension from "./MultiDimension";
@@ -182,6 +184,18 @@ export const StatsInner = memo(
       return frameAndChildrenSelectedTogether(selectedElements);
     }, [selectedElements]);
 
+    const selectedFrameLikeElement = useMemo(() => {
+      const frameLikeElements = selectedElements.filter((element) =>
+        isFrameLikeElement(element),
+      );
+      return frameLikeElements.length === 1 ? frameLikeElements[0] : null;
+    }, [selectedElements]);
+
+    const elementPropertiesElement =
+      _frameAndChildrenSelectedTogether && selectedFrameLikeElement
+        ? selectedFrameLikeElement
+        : singleElement;
+
     return (
       <div className="exc-stats">
         <Island padding={3}>
@@ -238,7 +252,8 @@ export const StatsInner = memo(
             {renderCustomStats?.(elements, appState)}
           </Collapsible>
 
-          {!_frameAndChildrenSelectedTogether && selectedElements.length > 0 && (
+          {(selectedElements.length > 0 &&
+            (!_frameAndChildrenSelectedTogether || elementPropertiesElement)) && (
             <div
               id="elementStats"
               style={{
@@ -263,7 +278,7 @@ export const StatsInner = memo(
                 }
               >
                 <StatsRows>
-                  {singleElement && (
+                  {elementPropertiesElement && (
                     <>
                       {cropMode && (
                         <StatsRow heading>
@@ -272,7 +287,7 @@ export const StatsInner = memo(
                       )}
 
                       {appState.croppingElementId &&
-                        isImageElement(singleElement) &&
+                        isImageElement(elementPropertiesElement) &&
                         unCroppedDimension && (
                           <StatsRow columns={2}>
                             <div>{t("stats.width")}</div>
@@ -281,7 +296,7 @@ export const StatsInner = memo(
                         )}
 
                       {appState.croppingElementId &&
-                        isImageElement(singleElement) &&
+                        isImageElement(elementPropertiesElement) &&
                         unCroppedDimension && (
                           <StatsRow columns={2}>
                             <div>{t("stats.height")}</div>
@@ -296,12 +311,12 @@ export const StatsInner = memo(
                       >
                         {appState.croppingElementId
                           ? t("labels.imageCropping")
-                          : t(`element.${singleElement.type}`)}
+                          : t(`element.${elementPropertiesElement.type}`)}
                       </StatsRow>
 
                       <StatsRow>
                         <Position
-                          element={singleElement}
+                          element={elementPropertiesElement}
                           property="x"
                           elementsMap={elementsMap}
                           scene={scene}
@@ -310,17 +325,27 @@ export const StatsInner = memo(
                       </StatsRow>
                       <StatsRow>
                         <Position
-                          element={singleElement}
+                          element={elementPropertiesElement}
                           property="y"
                           elementsMap={elementsMap}
                           scene={scene}
                           appState={appState}
                         />
                       </StatsRow>
+                      {isFrameLikeElement(elementPropertiesElement) && (
+                        <StatsRow>
+                          <FrameSize
+                            element={elementPropertiesElement}
+                            scene={scene}
+                            appState={appState}
+                            app={app}
+                          />
+                        </StatsRow>
+                      )}
                       <StatsRow>
                         <Dimension
                           property="width"
-                          element={singleElement}
+                          element={elementPropertiesElement}
                           scene={scene}
                           appState={appState}
                         />
@@ -328,7 +353,7 @@ export const StatsInner = memo(
                       <StatsRow>
                         <Dimension
                           property="height"
-                          element={singleElement}
+                          element={elementPropertiesElement}
                           scene={scene}
                           appState={appState}
                         />
@@ -336,7 +361,7 @@ export const StatsInner = memo(
                       <StatsRow>
                         <Angle
                           property="angle"
-                          element={singleElement}
+                          element={elementPropertiesElement}
                           scene={scene}
                           appState={appState}
                         />
@@ -344,7 +369,7 @@ export const StatsInner = memo(
                       <StatsRow>
                         <FontSize
                           property="fontSize"
-                          element={singleElement}
+                          element={elementPropertiesElement}
                           scene={scene}
                           appState={appState}
                         />
@@ -352,7 +377,7 @@ export const StatsInner = memo(
                     </>
                   )}
 
-                  {multipleElements && (
+                  {multipleElements && !_frameAndChildrenSelectedTogether && (
                     <>
                       {elementsAreInSameGroup(multipleElements) && (
                         <StatsRow heading>{t("element.group")}</StatsRow>

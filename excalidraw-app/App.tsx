@@ -88,6 +88,7 @@ import DebugCanvas, {
 import "./index.scss";
 
 import { AppSidebar } from "./components/AppSidebar";
+import { RecordingRoot } from "./components/Recording/RecordingRoot";
 import {
   saveFile,
   loadFile,
@@ -210,6 +211,14 @@ const ExcalidrawWrapper = () => {
   const { editorTheme, appTheme, setAppTheme } = useHandleAppTheme();
 
   const [langCode, setLangCode] = useAppLangCode();
+
+  const [isRecordingOpen, setIsRecordingOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setIsRecordingOpen((prev) => !prev);
+    window.addEventListener(EVENT.TOGGLE_RECORDING, handler);
+    return () => window.removeEventListener(EVENT.TOGGLE_RECORDING, handler);
+  }, []);
 
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string>("");
@@ -769,6 +778,13 @@ const ExcalidrawWrapper = () => {
               },
             },
             {
+              label: t("labels.recording"),
+              category: DEFAULT_CATEGORIES.app,
+              perform: () => {
+                setIsRecordingOpen((prev) => !prev);
+              },
+            },
+            {
               label: t("labels.installPWA"),
               category: DEFAULT_CATEGORIES.app,
               predicate: () => !!pwaEvent,
@@ -792,6 +808,10 @@ const ExcalidrawWrapper = () => {
             ref={debugCanvasRef}
           />
         )}
+        <RecordingRoot
+          open={isRecordingOpen}
+          onClose={() => setIsRecordingOpen(false)}
+        />
       </Excalidraw>
     </div>
   );

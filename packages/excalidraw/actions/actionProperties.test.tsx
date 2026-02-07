@@ -205,6 +205,24 @@ describe("element locking", () => {
       );
     });
 
+    it("should show frame size controls when frame selected", () => {
+      const frame = API.createElement({
+        type: "frame",
+        width: 200,
+        height: 100,
+      });
+      API.setElements([frame]);
+      API.setSelectedElements([frame]);
+
+      expect(queryByTestId(document.body, "frame-size-preset")).not.toBe(null);
+      expect(queryByTestId(document.body, "frame-size-custom-width")).not.toBe(
+        null,
+      );
+      expect(queryByTestId(document.body, "frame-size-custom-height")).not.toBe(
+        null,
+      );
+    });
+
     it("should apply highlighter preset to selected freedraw elements", async () => {
       const freedraw = API.createElement({
         type: "freedraw",

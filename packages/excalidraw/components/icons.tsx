@@ -1807,6 +1807,15 @@ export const playerPlayIcon = createIcon(
   tablerIconProps,
 );
 
+export const playerPauseIcon = createIcon(
+  <>
+    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+    <path d="M7 5h3v14h-3z" strokeWidth="0" fill="currentColor"></path>
+    <path d="M14 5h3v14h-3z" strokeWidth="0" fill="currentColor"></path>
+  </>,
+  tablerIconProps,
+);
+
 export const playerStopFilledIcon = createIcon(
   <>
     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -2008,6 +2017,16 @@ export const clockIcon = createIcon(
     <path d="M20.984 12.53a9 9 0 1 0 -7.552 8.355" />
     <path d="M12 7v5l3 3" />
     <path d="M19 16l-2 3h4l-2 3" />
+  </g>,
+  tablerIconProps,
+);
+
+export const recordingIcon = createIcon(
+  <g strokeWidth={1.5}>
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <rect x="3" y="7" width="14" height="10" rx="2" />
+    <path d="M17 10l4 -2v8l-4 -2z" />
+    <circle cx="7" cy="12" r="1.25" fill="currentColor" stroke="none" />
   </g>,
   tablerIconProps,
 );

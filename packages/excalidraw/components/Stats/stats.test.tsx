@@ -8,6 +8,7 @@ import { setDateTimeForTests, reseed } from "@excalidraw/common";
 import { isInGroup } from "@excalidraw/element";
 
 import { isTextElement } from "@excalidraw/element";
+import { CaptureUpdateAction } from "@excalidraw/element";
 
 import type { Degrees } from "@excalidraw/math";
 
@@ -19,6 +20,7 @@ import type {
 
 import { Excalidraw, getCommonBounds } from "../..";
 import { actionGroup } from "../../actions";
+import { createUndoAction } from "../../actions/actionHistory";
 import { t } from "../../i18n";
 import * as StaticScene from "../../renderer/staticScene";
 import { API } from "../../tests/helpers/api";
@@ -324,6 +326,93 @@ describe("stats for a generic element", () => {
 
     expect(currentTopLeftX).toBeCloseTo(topLeftX, 4);
     expect(currentTopLeftY).toBeCloseTo(topLeftY, 4);
+  });
+});
+
+describe("stats for a frame element", () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    renderStaticScene.mockClear();
+    reseed(11);
+    setDateTimeForTests("201933152653");
+
+    await render(<Excalidraw handleKeyboardGlobally={true} />);
+
+    const frame = API.createElement({
+      type: "frame",
+      width: 200,
+      height: 100,
+      x: 10,
+      y: 20,
+    });
+
+    API.updateScene({
+      elements: [frame],
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+    API.setSelectedElements([frame]);
+
+    fireEvent.contextMenu(GlobalTestState.interactiveCanvas, {
+      button: 2,
+      clientX: 1,
+      clientY: 1,
+    });
+    const contextMenu = UI.queryContextMenu();
+    fireEvent.click(queryByTestId(contextMenu!, "stats")!);
+    stats = UI.queryStats();
+
+    elementStats = stats?.querySelector("#elementStats");
+  });
+
+  it("should apply aspect preset to a frame", () => {
+    const frame = API.getSelectedElement();
+    const presetSelect = elementStats?.querySelector(
+      '[data-testid="frame-size-preset"]',
+    ) as HTMLSelectElement;
+
+    expect(presetSelect).toBeDefined();
+    expect(frame.width).toBe(200);
+    expect(frame.height).toBe(100);
+
+    const undoStackLengthBefore = API.getUndoStack().length;
+    fireEvent.change(presetSelect, { target: { value: "16:9" } });
+    expect(API.getUndoStack().length).toBeGreaterThan(undoStackLengthBefore);
+    const undoStackLengthAfterChange = API.getUndoStack().length;
+
+    expect(frame.width).toBe(200);
+    expect(frame.height).toBeCloseTo(112.5, 2);
+
+    API.executeAction(createUndoAction(h.history));
+    expect(API.getUndoStack().length).toBe(undoStackLengthAfterChange - 1);
+
+    const latestFrame = API.getElement(frame);
+    expect(latestFrame.width).toBe(200);
+    expect(latestFrame.height).toBe(100);
+  });
+
+  it("should apply custom size to a frame", () => {
+    vi.useFakeTimers();
+    const frame = API.getSelectedElement();
+
+    const widthInput = elementStats?.querySelector(
+      '[data-testid="frame-size-custom-width"]',
+    ) as HTMLInputElement;
+    const heightInput = elementStats?.querySelector(
+      '[data-testid="frame-size-custom-height"]',
+    ) as HTMLInputElement;
+
+    expect(widthInput).toBeDefined();
+    expect(heightInput).toBeDefined();
+
+    UI.updateInput(widthInput, "320");
+    UI.updateInput(heightInput, "180");
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(frame.width).toBe(320);
+    expect(frame.height).toBe(180);
+    vi.useRealTimers();
   });
 });
 

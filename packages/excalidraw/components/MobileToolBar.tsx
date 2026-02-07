@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 
-import { KEYS, capitalizeString } from "@excalidraw/common";
+import { EVENT, KEYS, capitalizeString } from "@excalidraw/common";
 
 import { trackEvent } from "../analytics";
 
@@ -34,6 +34,7 @@ import {
   LassoIcon,
   mermaidLogoIcon,
   MagicIcon,
+  recordingIcon,
 } from "./icons";
 
 import "./ToolIcon.scss";
@@ -453,6 +454,13 @@ export const MobileToolBar = ({
             shortcut={KEYS.K.toLocaleUpperCase()}
           >
             {t("toolBar.laser")}
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() => window.dispatchEvent(new Event(EVENT.TOGGLE_RECORDING))}
+            icon={recordingIcon}
+            data-testid="toolbar-recording"
+          >
+            {t("labels.recording")}
           </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={() => app.setOpenDialog({ name: "ttd", tab: "mermaid" })}

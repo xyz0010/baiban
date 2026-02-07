@@ -2133,6 +2133,11 @@
   dependencies:
     "@types/ms" "*"
 
+"@types/dom-webcodecs@^0.1.6":
+  version "0.1.18"
+  resolved "https://registry.yarnpkg.com/@types/dom-webcodecs/-/dom-webcodecs-0.1.18.tgz#0a4a26ffef72e584976ca8bdaefc3119b533a5c4"
+  integrity sha512-vAvE8C9DGWR+tkb19xyjk1TSUlJ7RUzzp4a9Anu7mwBT+fpyePWK1UxmH14tMO5zHmrnrRIMg5NutnnDztLxgg==
+
 "@types/eslint-scope@^3.7.7":
   version "3.7.7"
   resolved "https://registry.npmjs.org/@types/eslint-scope/-/eslint-scope-3.7.7.tgz"
@@ -2290,6 +2295,11 @@
   version "2.0.11"
   resolved "https://registry.npmjs.org/@types/unist/-/unist-2.0.11.tgz"
   integrity sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==
+
+"@types/wicg-file-system-access@^2020.9.5":
+  version "2020.9.8"
+  resolved "https://registry.yarnpkg.com/@types/wicg-file-system-access/-/wicg-file-system-access-2020.9.8.tgz#a8b739854ccb74b8048ef607d3701e9d506830e7"
+  integrity sha512-ggMz8nOygG7d/stpH40WVaNvBwuyYLnrg5Mbyf6bmsj/8+gb6Ei4ZZ9/4PNpcPNTT8th9Q8sM8wYmWGjMWLX/A==
 
 "@types/yauzl@^2.9.1":
   version "2.10.3"
@@ -6465,6 +6475,14 @@ moo-color@^1.0.2:
   integrity sha512-i/+ZKXMDf6aqYtBhuOcej71YSlbjT3wCO/4H1j8rPvxDJEifdwgg5MaFyu6iYAT8GBZJg2z0dkgK4YMzvURALQ==
   dependencies:
     color-name "^1.1.4"
+
+mp4-muxer@5.2.2:
+  version "5.2.2"
+  resolved "https://registry.yarnpkg.com/mp4-muxer/-/mp4-muxer-5.2.2.tgz#40b93b1b727f5f4a9fbda131fe7c5b5013168bf1"
+  integrity sha512-dhozjTywI0h2qFzeShagt8YYw811fh1XlwiDCE2f6Aeqf6xG2CyuShoSa5E0AZDO8pPF0JOZ3wOmWBNWIGdSpQ==
+  dependencies:
+    "@types/dom-webcodecs" "^0.1.6"
+    "@types/wicg-file-system-access" "^2020.9.5"
 
 mri@^1.1.0:
   version "1.2.0"

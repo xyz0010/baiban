@@ -81,6 +81,7 @@ export enum EVENT {
   MENU_ITEM_SELECT = "menu.itemSelect",
   MESSAGE = "message",
   FULLSCREENCHANGE = "fullscreenchange",
+  TOGGLE_RECORDING = "recording.toggle",
 }
 
 export const YOUTUBE_STATES = {
