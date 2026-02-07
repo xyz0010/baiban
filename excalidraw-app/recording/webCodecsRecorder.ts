@@ -33,6 +33,7 @@ export class WebCodecsRecorder {
   private audioSampleRate = 48_000;
   private warmupFrames = 5;
   private audioTimestamp = 0;
+  private videoCodec: string | null = null;
 
   constructor(options: WebCodecsRecorderOptions) {
     this.width = options.width;
@@ -44,6 +45,7 @@ export class WebCodecsRecorder {
   }
 
   async start(): Promise<void> {
+    this.videoCodec = await this.pickSupportedVideoCodec();
     this.muxer = new Muxer({
       target: new ArrayBufferTarget(),
       video: { codec: "avc", width: this.width, height: this.height },
@@ -62,7 +64,7 @@ export class WebCodecsRecorder {
     });
 
     this.videoEncoder.configure({
-      codec: "avc1.640028",
+      codec: this.videoCodec,
       width: this.width,
       height: this.height,
       bitrate: this.videoBitrate,
@@ -146,6 +148,34 @@ export class WebCodecsRecorder {
     scriptNode.connect(this.audioContext.destination);
   }
 
+  private async pickSupportedVideoCodec(): Promise<string> {
+    const candidates = ["avc1.42E01E", "avc1.4D401E", "avc1.640028"];
+    if (typeof VideoEncoder === "undefined") {
+      return candidates[candidates.length - 1];
+    }
+    if (typeof VideoEncoder.isConfigSupported !== "function") {
+      return candidates[candidates.length - 1];
+    }
+    for (const codec of candidates) {
+      try {
+        const support = await VideoEncoder.isConfigSupported({
+          codec,
+          width: this.width,
+          height: this.height,
+          bitrate: this.videoBitrate,
+          framerate: this.frameRate,
+          latencyMode: "realtime",
+        });
+        if (support.supported) {
+          return codec;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return candidates[candidates.length - 1];
+  }
+
   addFrame(canvas: HTMLCanvasElement | OffscreenCanvas): void {
     if (!this.recording || this.paused || !this.videoEncoder) {
       return;
@@ -226,4 +256,3 @@ export class WebCodecsRecorder {
     return this.paused;
   }
 }
-

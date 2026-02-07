@@ -626,6 +626,7 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   public files: BinaryFiles = {};
+  private videoObjectURLs = new Map<FileId, { url: string; dataURL: DataURL }>();
   public imageCache: AppClassProperties["imageCache"] = new Map();
   private iFrameRefs = new Map<ExcalidrawElement["id"], HTMLIFrameElement>();
   /**
@@ -1626,7 +1627,7 @@ class App extends React.Component<AppProps, AppState> {
                 >
                   {el.link && el.link.startsWith("video-file:")
                     ? (() => {
-                        const fileId = el.link.replace("video-file:", "");
+                        const fileId = el.link.replace("video-file:", "") as FileId;
                         const file = this.files[fileId];
                         if (!file) {
                           return (
@@ -1644,7 +1645,7 @@ class App extends React.Component<AppProps, AppState> {
                         return (
                           <video
                             className="excalidraw__embeddable"
-                            src={file.dataURL}
+                            src={this.getVideoSrc(fileId, file)}
                             controls
                             style={{
                               width: "100%",
@@ -4785,9 +4786,55 @@ class App extends React.Component<AppProps, AppState> {
       }
     }
 
+    this.pruneVideoObjectURLs(nextFiles);
     this.files = nextFiles;
 
     return { addedFiles };
+  };
+
+  private isVideoFileData = (fileData: BinaryFileData) => {
+    return (
+      fileData.mimeType?.startsWith("video/") ||
+      fileData.dataURL.startsWith("data:video/")
+    );
+  };
+
+  private getVideoSrc = (fileId: FileId, fileData: BinaryFileData) => {
+    if (!this.isVideoFileData(fileData)) {
+      return fileData.dataURL;
+    }
+    if (fileData.dataURL.startsWith("blob:")) {
+      return fileData.dataURL;
+    }
+    const cached = this.videoObjectURLs.get(fileId);
+    if (cached && cached.dataURL === fileData.dataURL) {
+      return cached.url;
+    }
+    if (cached) {
+      URL.revokeObjectURL(cached.url);
+    }
+    try {
+      const file = dataURLToFile(fileData.dataURL, fileData.name || "video");
+      const url = URL.createObjectURL(file);
+      this.videoObjectURLs.set(fileId, { url, dataURL: fileData.dataURL });
+      return url;
+    } catch (error) {
+      return fileData.dataURL;
+    }
+  };
+
+  private pruneVideoObjectURLs = (nextFiles: BinaryFiles) => {
+    for (const [fileId, cached] of this.videoObjectURLs) {
+      const fileData = nextFiles[fileId];
+      if (
+        !fileData ||
+        !this.isVideoFileData(fileData) ||
+        fileData.dataURL !== cached.dataURL
+      ) {
+        URL.revokeObjectURL(cached.url);
+        this.videoObjectURLs.delete(fileId);
+      }
+    }
   };
 
   public updateScene = withBatchedUpdates(
