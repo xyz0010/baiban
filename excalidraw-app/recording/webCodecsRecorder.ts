@@ -19,6 +19,7 @@ export class WebCodecsRecorder {
   private audioEncoder: AudioEncoder | null = null;
   private audioContext: AudioContext | null = null;
   private mediaStreamSource: MediaStreamAudioSourceNode | null = null;
+  private audioScriptNode: ScriptProcessorNode | null = null;
 
   private width: number;
   private height: number;
@@ -103,19 +104,27 @@ export class WebCodecsRecorder {
     });
 
     this.audioContext = new AudioContext({ sampleRate: this.audioSampleRate });
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
     const audioTrack = this.audioStream.getAudioTracks()[0];
     if (!audioTrack) {
       return;
     }
+    audioTrack.enabled = true;
 
     const audioOnlyStream = new MediaStream([audioTrack]);
     this.mediaStreamSource = this.audioContext.createMediaStreamSource(audioOnlyStream);
 
     const bufferSize = 4096;
     const scriptNode = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+    this.audioScriptNode = scriptNode;
 
     scriptNode.onaudioprocess = (event) => {
       if (!this.recording || this.paused || !this.audioEncoder) {
+        return;
+      }
+      if (this.audioEncoder.state === "closed") {
         return;
       }
 
@@ -139,6 +148,8 @@ export class WebCodecsRecorder {
 
       try {
         this.audioEncoder.encode(audioData);
+      } catch {
+        return;
       } finally {
         audioData.close();
       }
@@ -227,15 +238,29 @@ export class WebCodecsRecorder {
     }
 
     if (this.audioEncoder) {
-      await this.audioEncoder.flush();
-      this.audioEncoder.close();
+      if (this.audioScriptNode) {
+        this.audioScriptNode.onaudioprocess = null;
+        this.audioScriptNode.disconnect();
+        this.audioScriptNode = null;
+      }
+      if (this.mediaStreamSource) {
+        this.mediaStreamSource.disconnect();
+        this.mediaStreamSource = null;
+      }
+      if (this.audioEncoder.state !== "closed") {
+        try {
+          await this.audioEncoder.flush();
+        } catch {
+          // ignore closed/invalid state during shutdown
+        }
+        this.audioEncoder.close();
+      }
       this.audioEncoder = null;
     }
 
     if (this.audioContext) {
       await this.audioContext.close();
       this.audioContext = null;
-      this.mediaStreamSource = null;
     }
 
     if (!this.muxer) {

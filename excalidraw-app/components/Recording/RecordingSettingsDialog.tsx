@@ -21,6 +21,19 @@ type SliderFieldProps = {
   valueFormatter?: (value: number) => string;
 };
 
+const recordingBackgroundImages = [
+  { label: "bg-1.jpg", value: "/recording-backgrounds/bg-1.jpg" },
+  { label: "bg-2.jpg", value: "/recording-backgrounds/bg-2.jpg" },
+  { label: "bg-3.jpg", value: "/recording-backgrounds/bg-3.jpg" },
+  { label: "bg-4.jpg", value: "/recording-backgrounds/bg-4.jpg" },
+];
+
+const recordingQualityPresets = [
+  { id: "low", frameRate: 24, videoBitrate: 3_000_000, audioBitrate: 96_000 },
+  { id: "medium", frameRate: 30, videoBitrate: 6_000_000, audioBitrate: 128_000 },
+  { id: "high", frameRate: 60, videoBitrate: 12_000_000, audioBitrate: 192_000 },
+];
+
 const RecordingSliderField = ({
   label,
   value,
@@ -104,6 +117,61 @@ export const RecordingSettingsDialog = ({
     return null;
   }
 
+  const qualityOptions = [
+    {
+      ...recordingQualityPresets[0],
+      label: t("labels.recordingQualityLow"),
+    },
+    {
+      ...recordingQualityPresets[1],
+      label: t("labels.recordingQualityMedium"),
+    },
+    {
+      ...recordingQualityPresets[2],
+      label: t("labels.recordingQualityHigh"),
+    },
+  ];
+  const defaultQuality = qualityOptions[1];
+  const activeQuality =
+    qualityOptions.find(
+      (option) =>
+        option.frameRate === settings.frameRate &&
+        option.videoBitrate === settings.videoBitrate &&
+        option.audioBitrate === settings.audioBitrate,
+    ) ?? defaultQuality;
+
+  const selectedImageValue = recordingBackgroundImages.some(
+    (option) => option.value === settings.backgroundValue,
+  )
+    ? settings.backgroundValue
+    : recordingBackgroundImages[0].value;
+
+  useEffect(() => {
+    if (
+      settings.frameRate !== activeQuality.frameRate ||
+      settings.videoBitrate !== activeQuality.videoBitrate ||
+      settings.audioBitrate !== activeQuality.audioBitrate
+    ) {
+      onChange({
+        ...settings,
+        frameRate: activeQuality.frameRate,
+        videoBitrate: activeQuality.videoBitrate,
+        audioBitrate: activeQuality.audioBitrate,
+      });
+      return;
+    }
+    if (
+      settings.backgroundType !== "image" ||
+      settings.backgroundValue !== selectedImageValue
+    ) {
+      onChange({
+        ...settings,
+        backgroundType: "image",
+        backgroundValue: selectedImageValue,
+      });
+    }
+  }, [activeQuality, onChange, selectedImageValue, settings]);
+
   return (
     <Dialog
       title={t("labels.recordingSettings")}
@@ -156,103 +224,46 @@ export const RecordingSettingsDialog = ({
           </div>
         )}
 
-        <div className="excalidraw-recording-settings__grid2">
-          <RecordingSliderField
-            label={t("labels.recordingFrameRate")}
-            value={settings.frameRate}
-            min={5}
-            max={60}
-            onChange={(value) =>
-              onChange({
-                ...settings,
-                frameRate: value,
-              })
-            }
-          />
-          <RecordingSliderField
-            label={t("labels.recordingPadding")}
-            value={settings.padding}
-            min={0}
-            max={200}
-            onChange={(value) =>
-              onChange({
-                ...settings,
-                padding: value,
-              })
-            }
-          />
-        </div>
-
-        <div className="excalidraw-recording-settings__grid2">
-          <RecordingSliderField
-            label={t("labels.recordingCornerRadius")}
-            value={settings.cornerRadius}
-            min={0}
-            max={64}
-            onChange={(value) =>
-              onChange({
-                ...settings,
-                cornerRadius: value,
-              })
-            }
-          />
-          <RecordingSliderField
-            label={t("labels.recordingVideoBitrate")}
-            value={Math.round(settings.videoBitrate / 1_000_000)}
-            min={1}
-            max={50}
-            onChange={(value) =>
-              onChange({ ...settings, videoBitrate: value * 1_000_000 })
-            }
-          />
-        </div>
-
-        <RecordingSliderField
-          label={t("labels.recordingAudioBitrate")}
-          value={Math.round(settings.audioBitrate / 1_000)}
-          min={32}
-          max={320}
-          onChange={(value) =>
-            onChange({ ...settings, audioBitrate: value * 1_000 })
-          }
-        />
-
         <label>
-          <span>{t("labels.recordingBackground")}</span>
+          <span>{t("labels.recordingQuality")}</span>
           <select
-            value={settings.backgroundType}
-            onChange={(e) =>
-              onChange({ ...settings, backgroundType: e.target.value as any })
-            }
+            value={activeQuality.id}
+            onChange={(e) => {
+              const next =
+                qualityOptions.find((option) => option.id === e.target.value) ??
+                defaultQuality;
+              onChange({
+                ...settings,
+                frameRate: next.frameRate,
+                videoBitrate: next.videoBitrate,
+                audioBitrate: next.audioBitrate,
+              });
+            }}
           >
-            <option value="solid">{t("labels.recordingSolid")}</option>
-            <option value="linearGradient">{t("labels.recordingGradient")}</option>
-            <option value="none">{t("labels.recordingNone")}</option>
+            {qualityOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
 
-        {settings.backgroundType === "solid" && (
-          <label>
-            <span>{t("labels.recordingColor")}</span>
-            <input
-              type="color"
-              value={settings.backgroundValue}
-              onChange={(e) => onChange({ ...settings, backgroundValue: e.target.value })}
-            />
-          </label>
-        )}
-
-        {settings.backgroundType === "linearGradient" && (
-          <label>
-            <span>{t("labels.recordingGradient")}</span>
-            <input
-              type="text"
-              value={settings.backgroundValue}
-              onChange={(e) => onChange({ ...settings, backgroundValue: e.target.value })}
-              placeholder="linear-gradient(135deg, #fff 0%, #000 100%)"
-            />
-          </label>
-        )}
+        <div className="excalidraw-recording-settings__background">
+          <span>{t("labels.recordingBackground")}</span>
+          <div className="excalidraw-recording-settings__background-grid">
+            {recordingBackgroundImages.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="excalidraw-recording-settings__background-option"
+                data-selected={option.value === selectedImageValue}
+                style={{ backgroundImage: `url(${option.value})` }}
+                onClick={() => onChange({ ...settings, backgroundValue: option.value })}
+              >
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="excalidraw-recording-settings__toggle">
           <input
@@ -276,26 +287,6 @@ export const RecordingSettingsDialog = ({
               })
             }
           />
-        )}
-
-        <label className="excalidraw-recording-settings__toggle">
-          <input
-            type="checkbox"
-            checked={settings.cursorEnabled}
-            onChange={(e) => onChange({ ...settings, cursorEnabled: e.target.checked })}
-          />
-          <span>{t("labels.recordingCursor")}</span>
-        </label>
-
-        {settings.cursorEnabled && (
-          <label>
-            <span>{t("labels.recordingCursorColor")}</span>
-            <input
-              type="color"
-              value={settings.cursorColor}
-              onChange={(e) => onChange({ ...settings, cursorColor: e.target.value })}
-            />
-          </label>
         )}
 
         <label className="excalidraw-recording-settings__toggle">

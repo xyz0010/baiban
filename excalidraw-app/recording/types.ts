@@ -1,6 +1,6 @@
 export type AspectRatioPreset = "16:9" | "4:3" | "9:16" | "1:1" | "custom";
 
-export type BackgroundType = "none" | "solid" | "linearGradient";
+export type BackgroundType = "none" | "solid" | "linearGradient" | "image";
 
 export type TitlePosition = "bottom-left" | "bottom-right";
 
@@ -40,13 +40,13 @@ export const DEFAULT_RECORDING_SETTINGS: RecordingSettings = {
   frameRate: 30,
   videoBitrate: 6_000_000,
   audioBitrate: 128_000,
-  backgroundType: "solid",
-  backgroundValue: "#ffffff",
+  backgroundType: "image",
+  backgroundValue: "/recording-backgrounds/bg-1.jpg",
   padding: 32,
   cornerRadius: 12,
   webcamEnabled: true,
   webcamSize: 160,
-  cursorEnabled: true,
+  cursorEnabled: false,
   cursorColor: "#ef4444",
   titleEnabled: false,
   titleText: "",

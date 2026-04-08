@@ -30,6 +30,7 @@ import {
   type RecordingFrame,
   type RecordingSettings,
 } from "../../recording/types";
+import "./Recording.scss";
 
 type Props = {
   open: boolean;
@@ -78,6 +79,10 @@ const getDefaultPanelPosition = () => {
   };
 };
 
+const isLegacyDefaultPanelPosition = (point: Point) => {
+  return point.x <= 24 && point.y >= window.innerHeight - 140;
+};
+
 export const RecordingRoot = ({ open, onClose }: Props) => {
   const storedPanelPositionRef = useRef(false);
   const appliedDefaultPanelPositionRef = useRef(false);
@@ -88,7 +93,15 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
         return DEFAULT_RECORDING_SETTINGS;
       }
       const parsed = JSON.parse(raw) as Partial<RecordingSettings>;
-      return { ...DEFAULT_RECORDING_SETTINGS, ...parsed };
+      const next = { ...DEFAULT_RECORDING_SETTINGS, ...parsed };
+      if (next.backgroundType !== "image") {
+        next.backgroundType = "image";
+      }
+      if (!next.backgroundValue) {
+        next.backgroundValue = DEFAULT_RECORDING_SETTINGS.backgroundValue;
+      }
+      next.cursorEnabled = false;
+      return next;
     } catch {
       return DEFAULT_RECORDING_SETTINGS;
     }
@@ -113,8 +126,11 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
           typeof parsed.y === "number" &&
           Number.isFinite(parsed.y)
         ) {
-          storedPanelPositionRef.current = true;
-          return { x: parsed.x, y: parsed.y };
+          const candidate = { x: parsed.x, y: parsed.y };
+          if (!isLegacyDefaultPanelPosition(candidate)) {
+            storedPanelPositionRef.current = true;
+            return candidate;
+          }
         }
       }
     } catch {
@@ -132,9 +148,25 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
   const frameRef = useRef<RecordingFrame | null>(null);
   const webcamPositionRef = useRef<Point>({ x: 0, y: 0 });
   const mousePositionRef = useRef<Point>({ x: 0, y: 0 });
+  const settingsRef = useRef(settings);
+  const mousePressedRef = useRef(false);
+  const webcamPromiseRef = useRef<Promise<MediaStream | null> | null>(null);
+  const lastFrameTimeRef = useRef(0);
   const elapsedBaseRef = useRef(0);
   const elapsedStartRef = useRef<number | null>(null);
   const elapsedIntervalRef = useRef<number | null>(null);
+
+  const stopWebcam = useCallback(() => {
+    webcamPromiseRef.current = null;
+    if (webcamStream) {
+      webcamStream.getTracks().forEach((t) => t.stop());
+      setWebcamStream(null);
+    }
+    const video = webcamVideoRef.current;
+    if (video) {
+      video.srcObject = null;
+    }
+  }, [webcamStream]);
 
   useEffect(() => {
     if (storedPanelPositionRef.current || appliedDefaultPanelPositionRef.current) {
@@ -162,6 +194,45 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
   }, []);
 
   useEffect(() => {
+    if (storedPanelPositionRef.current || appliedDefaultPanelPositionRef.current) {
+      return;
+    }
+    let tries = 0;
+    const tick = () => {
+      if (storedPanelPositionRef.current || appliedDefaultPanelPositionRef.current) {
+        return;
+      }
+      const panelEl = panelRef.current;
+      const toolbarEl = document.querySelector<HTMLElement>(".App-toolbar-container");
+      const toolbarRect = toolbarEl?.getBoundingClientRect();
+      if (!panelEl || !toolbarRect) {
+        tries++;
+        if (tries < 30) {
+          rafRef.current = window.requestAnimationFrame(tick);
+        }
+        return;
+      }
+      const panelRect = panelEl.getBoundingClientRect();
+      const margin = 12;
+      const maxX = Math.max(0, window.innerWidth - panelRect.width - margin);
+      const maxY = Math.max(0, window.innerHeight - panelRect.height - margin);
+      const next = {
+        x: Math.min(maxX, Math.max(margin, toolbarRect.right + margin)),
+        y: Math.min(maxY, Math.max(margin, toolbarRect.top)),
+      };
+      setPanelPosition(next);
+      appliedDefaultPanelPositionRef.current = true;
+    };
+    rafRef.current = window.requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current != null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [open]);
+
+  useEffect(() => {
     frameRef.current = frame;
   }, [frame]);
 
@@ -174,6 +245,10 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
   }, [mousePosition]);
 
   useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
     if (!open) {
       setIsPreviewing(false);
       setIsRecording(false);
@@ -183,8 +258,9 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
       setElapsedMs(0);
       elapsedBaseRef.current = 0;
       elapsedStartRef.current = null;
+      stopWebcam();
     }
-  }, [open]);
+  }, [open, stopWebcam]);
 
   useEffect(() => {
     try {
@@ -260,12 +336,25 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
   useEffect(() => {
     const onMouseMove = (event: MouseEvent) => {
       mousePositionRef.current = { x: event.clientX, y: event.clientY };
+      mousePressedRef.current = (event.buttons & 1) !== 0;
       if (isRecording) {
         setMousePosition({ x: event.clientX, y: event.clientY });
       }
     };
+    const onMouseDown = () => {
+      mousePressedRef.current = true;
+    };
+    const onMouseUp = () => {
+      mousePressedRef.current = false;
+    };
     window.addEventListener("mousemove", onMouseMove);
-    return () => window.removeEventListener("mousemove", onMouseMove);
+    window.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
   }, [isRecording]);
 
   const ensureWebcam = useCallback(async () => {
@@ -275,6 +364,10 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
     if (webcamStream) {
       return webcamStream;
     }
+    if (webcamPromiseRef.current) {
+      return webcamPromiseRef.current;
+    }
+    webcamPromiseRef.current = (async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" },
       audio: true,
@@ -286,6 +379,12 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
       await video.play();
     }
     return stream;
+    })();
+    try {
+      return await webcamPromiseRef.current;
+    } finally {
+      webcamPromiseRef.current = null;
+    }
   }, [settings.webcamEnabled, webcamStream]);
 
   const computeFrame = useCallback((nextSettings: RecordingSettings) => {
@@ -330,7 +429,11 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
       return;
     }
     setFrame(nextFrame);
-    setWebcamPosition({ x: nextFrame.x + 20, y: nextFrame.y + 100 });
+    const webcamMargin = 20;
+    setWebcamPosition({
+      x: nextFrame.x + nextFrame.width - settings.webcamSize - webcamMargin,
+      y: nextFrame.y + nextFrame.height - settings.webcamSize - webcamMargin,
+    });
     setIsPreviewing(true);
     await ensureWebcam();
   }, [computeFrame, ensureWebcam, settings]);
@@ -517,7 +620,8 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
   const cancelPreview = useCallback(() => {
     setIsPreviewing(false);
     setFrame(null);
-  }, []);
+    stopWebcam();
+  }, [stopWebcam]);
 
   const startRenderLoop = useCallback(() => {
     const outputCanvas = outputCanvasRef.current;
@@ -533,17 +637,27 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
     outputCanvas.height = height;
 
     const tick = () => {
+      const frameRate = Math.max(1, settingsRef.current.frameRate);
+      const frameInterval = 1000 / frameRate;
+      const now = performance.now();
+      if (lastFrameTimeRef.current !== 0 && now - lastFrameTimeRef.current < frameInterval) {
+        rafRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+      lastFrameTimeRef.current = now;
       const excalidrawContainer = document.querySelector<HTMLElement>(".excalidraw-container");
+      const renderSettings = { ...settingsRef.current, cursorEnabled: true };
       renderer.render({
         ctx,
         outputWidth: width,
         outputHeight: height,
         excalidrawContainer,
         frame: frameRef.current,
-        settings,
+        settings: renderSettings,
         webcamVideo: webcamVideoRef.current,
         webcamPosition: webcamPositionRef.current,
         mousePosition: mousePositionRef.current,
+        mousePressed: mousePressedRef.current,
       });
 
       recorderRef.current?.addFrame(outputCanvas);
@@ -558,6 +672,7 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
       window.cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
+    lastFrameTimeRef.current = 0;
   }, []);
 
   const startRecording = useCallback(async () => {
@@ -565,10 +680,12 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
       await enterPreview();
     }
 
+    lastFrameTimeRef.current = 0;
     const outputCanvas = outputCanvasRef.current;
     if (!outputCanvas) {
       return;
     }
+    const webcamStreamForRecording = await ensureWebcam();
     const { width, height } = getRecordingDimensions(settings);
     outputCanvas.width = width;
     outputCanvas.height = height;
@@ -585,11 +702,11 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
     await ctrl.start({
       canvas: outputCanvas,
       settings,
-      audioStream: settings.webcamEnabled ? webcamStream ?? undefined : undefined,
+      audioStream: settings.webcamEnabled ? webcamStreamForRecording ?? undefined : undefined,
     });
 
     startRenderLoop();
-  }, [enterPreview, settings, startRenderLoop, webcamStream]);
+  }, [enterPreview, ensureWebcam, settings, startRenderLoop]);
 
   const togglePause = useCallback(() => {
     const ctrl = recorderRef.current;
@@ -630,15 +747,19 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
 
     const result = await ctrl.stop();
     recorderRef.current = null;
+    stopWebcam();
 
     const name = `excalidraw-recording-${Date.now()}`;
-    await fileSave(result.blob, {
+    const mimeType = result.mimeType.split(";")[0];
+    const exportBlob =
+      result.blob.type === mimeType ? result.blob : new Blob([result.blob], { type: mimeType });
+    await fileSave(exportBlob, {
       name,
       extension: result.extension,
       description: t("buttons.exportVideo"),
-      mimeTypes: [result.mimeType],
+      mimeTypes: [mimeType],
     } as any);
-  }, [settings.webcamEnabled, stopRenderLoop, webcamStream]);
+  }, [settings.webcamEnabled, stopRenderLoop, stopWebcam, webcamStream]);
 
   useEffect(() => {
     return () => {
@@ -656,10 +777,9 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
       return;
     }
     if (webcamStream) {
-      webcamStream.getTracks().forEach((t) => t.stop());
-      setWebcamStream(null);
+      stopWebcam();
     }
-  }, [settings.webcamEnabled, webcamStream]);
+  }, [settings.webcamEnabled, webcamStream, stopWebcam]);
 
   const onWebcamPointerDown = useCallback(
     (event: ReactPointerEvent) => {
@@ -781,9 +901,11 @@ export const RecordingRoot = ({ open, onClose }: Props) => {
               label={t("labels.recordingSettings")}
             />
           </Button>
-          <Button onSelect={onClose} className="excalidraw-recording-button">
-            <RecordingButtonContent icon={CloseIcon} label={t("buttons.close")} />
-          </Button>
+          {!isRecording && (
+            <Button onSelect={onClose} className="excalidraw-recording-button">
+              <span className="excalidraw-recording-button-content">{CloseIcon}</span>
+            </Button>
+          )}
           </Stack.Row>
         </Island>
       </div>

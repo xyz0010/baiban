@@ -10,6 +10,7 @@ type RenderOptions = {
   webcamVideo: HTMLVideoElement | null;
   webcamPosition: Point;
   mousePosition: Point;
+  mousePressed: boolean;
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -64,6 +65,52 @@ const parseLinearGradient = (
   return gradient;
 };
 
+const backgroundImageCache = new Map<string, HTMLImageElement>();
+
+const getBackgroundImage = (src: string) => {
+  if (!src) {
+    return null;
+  }
+  const cached = backgroundImageCache.get(src);
+  if (cached) {
+    return cached;
+  }
+  const image = new Image();
+  if (!src.startsWith("data:")) {
+    image.crossOrigin = "anonymous";
+  }
+  image.src = src;
+  backgroundImageCache.set(src, image);
+  return image;
+};
+
+const drawImageCover = (
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+) => {
+  const imageWidth = image.naturalWidth || image.width;
+  const imageHeight = image.naturalHeight || image.height;
+  if (!imageWidth || !imageHeight) {
+    return;
+  }
+  const targetRatio = width / height;
+  const imageRatio = imageWidth / imageHeight;
+  let drawWidth = width;
+  let drawHeight = height;
+  if (imageRatio > targetRatio) {
+    drawHeight = height;
+    drawWidth = height * imageRatio;
+  } else {
+    drawWidth = width;
+    drawHeight = width / imageRatio;
+  }
+  const dx = (width - drawWidth) / 2;
+  const dy = (height - drawHeight) / 2;
+  ctx.drawImage(image, dx, dy, drawWidth, drawHeight);
+};
+
 const drawBackground = ({
   ctx,
   settings,
@@ -84,6 +131,17 @@ const drawBackground = ({
     );
     ctx.fillStyle = fill as any;
     ctx.fillRect(0, 0, outputWidth, outputHeight);
+    return;
+  }
+
+  if (settings.backgroundType === "image") {
+    const image = getBackgroundImage(settings.backgroundValue);
+    if (!image || !image.complete) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, outputWidth, outputHeight);
+      return;
+    }
+    drawImageCover(ctx, image, outputWidth, outputHeight);
     return;
   }
 
@@ -224,12 +282,19 @@ const drawCursor = ({
   ctx,
   settings,
   mousePosition,
+  mousePressed,
   frame,
   outputWidth,
   outputHeight,
 }: Pick<
   RenderOptions,
-  "ctx" | "settings" | "mousePosition" | "frame" | "outputWidth" | "outputHeight"
+  | "ctx"
+  | "settings"
+  | "mousePosition"
+  | "mousePressed"
+  | "frame"
+  | "outputWidth"
+  | "outputHeight"
 >) => {
   if (!settings.cursorEnabled || !frame) {
     return;
@@ -255,10 +320,26 @@ const drawCursor = ({
   const cursorX = contentX + (mousePosition.x - frame.x) * scaleX;
   const cursorY = contentY + (mousePosition.y - frame.y) * scaleY;
 
+  ctx.save();
+  ctx.translate(cursorX, cursorY);
+  ctx.scale(mousePressed ? 1.2 : 1.8, mousePressed ? 1.2 : 1.8);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(cursorX, cursorY, 18, 0, Math.PI * 2);
-  ctx.fillStyle = `${settings.cursorColor}80`;
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, 26);
+  ctx.lineTo(6, 20);
+  ctx.lineTo(11, 30);
+  ctx.lineTo(15, 28);
+  ctx.lineTo(9, 18);
+  ctx.lineTo(20, 18);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
   ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "#111827";
+  ctx.stroke();
+  ctx.restore();
 };
 
 const drawTitle = ({
@@ -328,4 +409,3 @@ export const computeDefaultFrameToFit = (opts: {
   const y = containerRect.top + (containerRect.height - height) / 2;
   return { x, y, width, height };
 };
-

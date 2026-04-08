@@ -77,7 +77,8 @@ export class RecorderController {
   }): Promise<RecordingStartResult> {
     this.assertNotRecording();
 
-    if (isWebCodecsSupported()) {
+    const hasAudio = (opts.audioStream?.getAudioTracks().length ?? 0) > 0;
+    if (isWebCodecsSupported() && !hasAudio) {
       const recorder = new WebCodecsRecorder({
         width: opts.canvas.width,
         height: opts.canvas.height,
@@ -203,4 +204,3 @@ export class RecorderController {
     this.stopMediaRecorderReject = null;
   }
 }
-

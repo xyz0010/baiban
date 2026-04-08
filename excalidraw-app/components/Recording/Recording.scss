@@ -164,6 +164,7 @@
     box-shadow: var(--shadow-island);
     outline: 2px solid color-mix(in srgb, var(--island-bg-color) 85%, transparent);
     outline-offset: 0;
+    z-index: 1001;
   }
 
   .excalidraw-recording-webcam:active {
@@ -257,6 +258,77 @@
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
   }
+
+  .excalidraw-recording-settings__background {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .excalidraw-recording-settings__background > span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary-color);
+  }
+
+  .excalidraw-recording-settings__background-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 64px);
+    gap: 0.4rem;
+  }
+
+  .excalidraw-recording-settings__background-option {
+    position: relative;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 0;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--color-surface-low);
+    cursor: pointer;
+    box-shadow: var(--shadow-island);
+    overflow: hidden;
+  }
+
+  .excalidraw-recording-settings__background-option[data-selected="true"] {
+    border-color: var(--color-primary);
+  }
+
+  .excalidraw-recording-settings__background-option::after {
+    content: "";
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-surface-high);
+    opacity: 0;
+  }
+
+  .excalidraw-recording-settings__background-option[data-selected="true"]::after {
+    opacity: 1;
+  }
+
+  .excalidraw-recording-settings__background-option::before {
+    content: "";
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 8px;
+    height: 4px;
+    border-left: 2px solid var(--color-surface-high);
+    border-bottom: 2px solid var(--color-surface-high);
+    transform: rotate(-45deg);
+    opacity: 0;
+  }
+
+  .excalidraw-recording-settings__background-option[data-selected="true"]::before {
+    opacity: 1;
+  }
+
 
   .excalidraw-recording-settings .range-wrapper {
     position: relative;
