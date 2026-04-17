@@ -30,7 +30,6 @@ import {
   type RecordingFrame,
   type RecordingSettings,
 } from "../../recording/types";
-import "./Recording.scss";
 
 type Props = {
   open: boolean;

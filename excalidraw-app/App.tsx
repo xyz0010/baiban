@@ -26,7 +26,7 @@ import {
   isDevEnv,
 } from "@excalidraw/common";
 import polyfill from "@excalidraw/excalidraw/polyfill";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { useCallbackRefState } from "@excalidraw/excalidraw/hooks/useCallbackRefState";
 import { t } from "@excalidraw/excalidraw/i18n";
@@ -88,6 +88,7 @@ import DebugCanvas, {
 import "./index.scss";
 
 import { AppSidebar } from "./components/AppSidebar";
+import { RecordingRoot } from "./components/Recording/RecordingRoot";
 import {
   saveFile,
   loadFile,
@@ -96,12 +97,6 @@ import {
   getFileMetadata,
 } from "./data/LocalFileStorage";
 import { useAtomValue } from "./app-jotai";
-
-const RecordingRoot = lazy(() =>
-  import("./components/Recording/RecordingRoot").then((module) => ({
-    default: module.RecordingRoot,
-  })),
-);
 
 polyfill();
 
@@ -218,13 +213,6 @@ const ExcalidrawWrapper = () => {
   const [langCode, setLangCode] = useAppLangCode();
 
   const [isRecordingOpen, setIsRecordingOpen] = useState(false);
-  const [shouldLoadRecording, setShouldLoadRecording] = useState(false);
-
-  useEffect(() => {
-    if (isRecordingOpen) {
-      setShouldLoadRecording(true);
-    }
-  }, [isRecordingOpen]);
 
   useEffect(() => {
     const handler = () => setIsRecordingOpen((prev) => !prev);
@@ -820,14 +808,10 @@ const ExcalidrawWrapper = () => {
             ref={debugCanvasRef}
           />
         )}
-        {shouldLoadRecording && (
-          <Suspense fallback={null}>
-            <RecordingRoot
-              open={isRecordingOpen}
-              onClose={() => setIsRecordingOpen(false)}
-            />
-          </Suspense>
-        )}
+        <RecordingRoot
+          open={isRecordingOpen}
+          onClose={() => setIsRecordingOpen(false)}
+        />
       </Excalidraw>
     </div>
   );

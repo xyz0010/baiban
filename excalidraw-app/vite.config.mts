@@ -8,16 +8,9 @@ import checker from "vite-plugin-checker";
 import { createHtmlPlugin } from "vite-plugin-html";
 import Sitemap from "vite-plugin-sitemap";
 import { woff2BrowserPlugin } from "../scripts/woff2/woff2-vite-plugins";
-export default defineConfig(({ mode, command }) => {
+export default defineConfig(({ mode }) => {
   // To load .env variables
   const envVars = loadEnv(mode, `../`);
-  const isDevServer = command === "serve";
-  const isTypecheckEnabled = isDevServer
-    ? envVars.VITE_APP_ENABLE_TYPESCRIPT === "true"
-    : envVars.VITE_APP_ENABLE_TYPESCRIPT !== "false";
-  const isEslintEnabled = isDevServer
-    ? envVars.VITE_APP_ENABLE_ESLINT === "true"
-    : envVars.VITE_APP_ENABLE_ESLINT !== "false";
   // https://vitejs.dev/config/
   return {
     server: {
@@ -87,10 +80,6 @@ export default defineConfig(({ mode, command }) => {
     build: {
       outDir: "build",
       chunkSizeWarningLimit: 2000,
-      modulePreload: {
-        resolveDependencies: (_, deps) =>
-          deps.filter((dep) => !dep.includes("recording-")),
-      },
       rollupOptions: {
         output: {
           assetFileNames(chunkInfo) {
@@ -115,36 +104,11 @@ export default defineConfig(({ mode, command }) => {
               return `locales/${id.substring(index + 8)}`;
             }
 
-            if (
-              id.includes("/excalidraw-app/components/Recording/") ||
-              id.includes("/excalidraw-app/recording/")
-            ) {
-              return "recording";
-            }
-
             if (id.includes("node_modules")) {
               if (id.includes("pdfjs-dist")) {
                 return "pdfjs-dist";
               }
-              if (
-                id.includes("/react/") ||
-                id.includes("/react-dom/") ||
-                id.includes("/scheduler/")
-              ) {
-                return "react-vendor";
-              }
-              if (
-                id.includes("/mermaid/") ||
-                id.includes("/dagre-") ||
-                id.includes("/d3-") ||
-                id.includes("/cytoscape/")
-              ) {
-                return "diagram-vendor";
-              }
-              if (id.includes("/@sentry/")) {
-                return "sentry-vendor";
-              }
-              return "vendor-misc";
+              return "vendor";
             }
           },
         },
@@ -164,10 +128,11 @@ export default defineConfig(({ mode, command }) => {
       woff2BrowserPlugin(),
       react(),
       checker({
-        typescript: isTypecheckEnabled,
-        eslint: isEslintEnabled
-          ? { lintCommand: 'eslint "./**/*.{js,ts,tsx}"' }
-          : undefined,
+        typescript: envVars.VITE_APP_ENABLE_TYPESCRIPT !== "false",
+        eslint:
+          envVars.VITE_APP_ENABLE_ESLINT === "false"
+            ? undefined
+            : { lintCommand: 'eslint "./**/*.{js,ts,tsx}"' },
         overlay: {
           initialIsOpen: envVars.VITE_APP_COLLAPSE_OVERLAY === "false",
           badgeStyle: "margin-bottom: 4rem; margin-left: 1rem",
